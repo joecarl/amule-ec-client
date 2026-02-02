@@ -3,7 +3,7 @@
  */
 
 import { AmuleConnection } from './AmuleConnection';
-import type { AmuleFile, AmuleTransferringFile, AmuleCategory, DownloadCommand, SearchType } from '../model';
+import type { AmuleFile, AmuleTransferringFile, AmuleCategory, AmuleServer, DownloadCommand, SearchType } from '../model';
 import type { SearchFilters } from '../types';
 
 export interface AmuleClientOptions {
@@ -14,6 +14,15 @@ export interface AmuleClientOptions {
 }
 
 export interface StatsResponse {
+	id: number;
+	ed2kId: number;
+	kadId?: string;
+	connectedServer?: {
+		name?: string;
+		description?: string;
+		ip: string;
+		port: number;
+	};
 	connectionState?: any; // Will be properly typed later
 	uploadOverhead: number;
 	downloadOverhead: number;
@@ -189,6 +198,39 @@ export class AmuleClient {
 		const packet = await this.connection.sendRequest(request);
 
 		return SharedFilesResponseParser.fromPacket(packet).files;
+	}
+
+	/**
+	 * Get the list of servers
+	 */
+	async getServerList(): Promise<AmuleServer[]> {
+		const { ServerListRequest } = await import('../request/ServerListRequest');
+		const { ServerListResponseParser } = await import('../response/ServerListResponse');
+
+		const request = new ServerListRequest();
+		const packet = await this.connection.sendRequest(request);
+
+		return ServerListResponseParser.fromPacket(packet).servers;
+	}
+
+	/**
+	 * Connect to a specific server
+	 */
+	async connectToServer(ip: string, port: number): Promise<void> {
+		const { ServerConnectRequest } = await import('../request/ServerConnectRequest');
+
+		const request = new ServerConnectRequest(ip, port);
+		await this.connection.sendRequest(request);
+	}
+
+	/**
+	 * Disconnect from the current server
+	 */
+	async disconnectFromServer(): Promise<void> {
+		const { ServerDisconnectRequest } = await import('../request/ServerDisconnectRequest');
+
+		const request = new ServerDisconnectRequest();
+		await this.connection.sendRequest(request);
 	}
 
 	/**

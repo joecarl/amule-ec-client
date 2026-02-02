@@ -54,6 +54,22 @@ export interface AmuleCategory {
 	priority: number;
 }
 
+export interface AmuleServer {
+	name?: string;
+	description?: string;
+	address?: string; // String representation usually
+	ip: string;
+	port: number;
+	ping?: number;
+	users?: number;
+	maxUsers?: number;
+	files?: number;
+	priority: number;
+	version?: string;
+	isStatic: boolean;
+	failedCount: number;
+}
+
 export enum FileStatus {
 	READY = 0,
 	EMPTY = 1,

@@ -33,11 +33,53 @@ export class StatsResponseParser {
 
 		const kadNodes = findNumericTag(packet.tags, ECTagName.EC_TAG_STATS_KAD_NODES_TOTAL)?.value || 0;
 
+		// Connection State & Server Info
+		const connStateTag = findTag(packet.tags, ECTagName.EC_TAG_CONNSTATE);
+		let ed2kId = 0;
+		let clientId = 0;
+		let kadId: string | undefined;
+		let connectedServer: StatsResponse['connectedServer'];
+
+		if (connStateTag && connStateTag.nestedTags) {
+			ed2kId = Number(findNumericTag(connStateTag.nestedTags, ECTagName.EC_TAG_ED2K_ID)?.value || 0);
+			clientId = Number(findNumericTag(connStateTag.nestedTags, ECTagName.EC_TAG_CLIENT_ID)?.value || 0);
+
+			const kadIdTag = findTag(connStateTag.nestedTags, ECTagName.EC_TAG_KAD_ID);
+			if (kadIdTag && kadIdTag.getValue() !== undefined) {
+				const val = kadIdTag.getValue();
+				if (typeof val === 'bigint') {
+					kadId = val.toString(16).padStart(32, '0');
+				} else if (val instanceof Buffer) {
+					kadId = val.toString('hex');
+				}
+			}
+
+			const serverTag = findTag(connStateTag.nestedTags, ECTagName.EC_TAG_SERVER);
+			if (serverTag) {
+				const serverVal = serverTag.getValue() as any;
+				if (serverVal && typeof serverVal === 'object' && 'address' in serverVal) {
+					connectedServer = {
+						ip: serverVal.address,
+						port: serverVal.port,
+						name: findTag(serverTag.nestedTags || [], ECTagName.EC_TAG_SERVER_NAME)?.getValue(),
+						description: findTag(serverTag.nestedTags || [], ECTagName.EC_TAG_SERVER_DESC)?.getValue(),
+					};
+				}
+			}
+		}
+
+		// Fallback for ID if not in connState
+		const id = clientId || findNumericTag(packet.tags, ECTagName.EC_TAG_CLIENT_ID)?.value || 0;
+
 		// Logger messages (if any)
 		const loggerMessage: string[] = [];
 		// TODO: Parse logger messages from nested tags if present
 
 		return {
+			id: Number(id),
+			ed2kId,
+			kadId,
+			connectedServer,
 			uploadOverhead: Number(uploadOverhead),
 			downloadOverhead: Number(downloadOverhead),
 			bannedCount: Number(bannedCount),
