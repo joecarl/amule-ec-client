@@ -1,6 +1,6 @@
 {
 	"name": "amule-ec-client",
-	"version": "0.1.0",
+	"version": "0.1.3",
 	"description": "A TypeScript client for Amule EC API.",
 	"author": "José Carlos HR <joecarlhr@gmail.com>",
 	"license": "MIT",
@@ -10,12 +10,6 @@
 	"files": [
 		"dist"
 	],
-	"exports": {
-		".": {
-			"types": "./dist/index.d.ts",
-			"import": "./dist/index.js"
-		}
-	},
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/joecarl/amule-ec-client.git"
