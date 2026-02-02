@@ -1,0 +1,40 @@
+{
+	"name": "amule-ec-client",
+	"version": "0.1.0",
+	"description": "A TypeScript client for Amule EC API.",
+	"author": "José Carlos HR <joecarlhr@gmail.com>",
+	"license": "MIT",
+	"type": "module",
+	"main": "dist/index.js",
+	"types": "dist/index.d.ts",
+	"files": [
+		"dist"
+	],
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		}
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/joecarl/amule-ec-client.git"
+	},
+	"devDependencies": {
+		"@types/node": "^25.2.0",
+		"tsup": "^8.5.1",
+		"tsx": "^4.21.0",
+		"typescript": "^5.9.3",
+		"vitest": "^4.0.16"
+	},
+	"bugs": {
+		"url": "https://github.com/joecarl/amule-ec-client/issues"
+	},
+	"homepage": "https://github.com/joecarl/amule-ec-client#readme",
+	"scripts": {
+		"build": "tsup",
+		"start": "echo \"Error: no dev mode available\" && exit 1",
+		"test": "vitest",
+		"prepublishOnly": "npm run build"
+	}
+}
