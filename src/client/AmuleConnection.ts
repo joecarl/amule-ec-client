@@ -235,8 +235,7 @@ export class AmuleConnection {
 		// Build and write packet
 		const packet = request.buildPacket();
 		const buffer = PacketWriter.write(packet);
-		this.log('Sending packet: opCode', packet.opCode, 'flags', packet.flags.getValue(), 'tags', packet.tags.length, 'bytes', buffer.length);
-		this.log('Packet hex:', buffer.toString('hex'));
+		this.log('Sending request:', packet.opCode.toString(16), 'Size:', buffer.length);
 
 		// Create promise for response
 		const responsePromise = new Promise<Packet>((resolve, reject) => {

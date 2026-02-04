@@ -5,6 +5,7 @@
 import { AmuleConnection } from './AmuleConnection';
 import type { AmuleFile, AmuleTransferringFile, AmuleCategory, AmuleServer, DownloadCommand, SearchType } from '../model';
 import type { SearchFilters } from '../types';
+import { EcPrefs } from '../ec/Codes';
 
 export interface AmuleClientOptions {
 	host: string;
@@ -237,16 +238,32 @@ export class AmuleClient {
 	 * Create a category
 	 */
 	async createCategory(category: AmuleCategory): Promise<void> {
-		// TODO: Implement category creation (requires complex tag structure)
-		throw new Error('Not implemented yet');
+		const { CreateCategoryRequest } = await import('../request/CreateCategoryRequest');
+
+		const request = new CreateCategoryRequest(category);
+		await this.connection.sendRequest(request);
+	}
+
+	/**
+	 * Delete a category
+	 */
+	async deleteCategory(id: number): Promise<void> {
+		const { DeleteCategoryRequest } = await import('../request/DeleteCategoryRequest');
+
+		const request = new DeleteCategoryRequest(id);
+		await this.connection.sendRequest(request);
 	}
 
 	/**
 	 * Get all categories
 	 */
 	async getCategories(): Promise<AmuleCategory[]> {
-		// TODO: Implement get categories (part of preferences)
-		return [];
+		const { GetPreferencesRequest } = await import('../request/GetPreferencesRequest');
+		const { PreferencesResponseParser } = await import('../response/PreferencesResponse');
+
+		const request = new GetPreferencesRequest(EcPrefs.EC_PREFS_CATEGORIES);
+		const packet = await this.connection.sendRequest(request);
+		return PreferencesResponseParser.fromPacket(packet).categories;
 	}
 
 	/**

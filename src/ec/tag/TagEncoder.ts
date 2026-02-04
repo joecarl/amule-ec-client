@@ -14,7 +14,7 @@ export class TagEncoder {
 	}
 
 	/**
-	 * Calculate total size needed for a tag
+	 * Calculate total size needed for a tag (Physical Buffer Size)
 	 */
 	calculateTagSize(tag: Tag<any>): number {
 		let size = 0;
@@ -32,9 +32,12 @@ export class TagEncoder {
 		size += 1; // type (uint8)
 
 		// Tag length (subtags + value)
-		const tagLength = this.calculateTagLength(tag);
+		// CRITICAL: The length field itself reports "Logical Length" (using fixed header sizes),
+		// NOT the physical byte length. This matches Jamule/aMule protocol expectation.
+		// However, the SIZE of the length field depends on the encoded value of this logical length.
+		const reportedLength = this.calculateReportedLength(tag);
 		if (this.useUtf8Numbers) {
-			size += numberLength(tagLength);
+			size += numberLength(reportedLength);
 		} else {
 			size += 4; // uint32
 		}
@@ -65,23 +68,28 @@ export class TagEncoder {
 	}
 
 	/**
-	 * Calculate the tag length field.
-	 * The tag length includes:
-	 * - The value of this tag
-	 * - All subtags with their full headers (name, type, length, [subtag count], value)
-	 *
-	 * IMPORTANT: The tag length does NOT include the subtag count field of THIS tag.
-	 * The subtag count is written separately after the tag length field.
+	 * Calculate the "Reported Length" of the tag content.
+	 * This logic mimics Jamule's computeTagLength, which assumes FIXED header sizes
+	 * (2 bytes name, 1 byte type, 4 bytes length, 2 bytes subtag count)
+	 * even when UTF-8 encoding is used.
 	 */
-	private calculateTagLength(tag: Tag<any>): number {
+	private calculateReportedLength(tag: Tag<any>): number {
 		let length = 0;
 
-		// Subtags themselves (full size with headers)
-		// Note: We do NOT add the subtag count field here - it's written separately
+		// Subtags
 		if (tag.nestedTags) {
 			for (const nestedTag of tag.nestedTags) {
-				// For each subtag, add: name + type + length + [its own subtag count if any] + value
-				length += this.calculateNestedTagFullSize(nestedTag);
+				// Reported length of subtag content
+				length += this.calculateReportedLength(nestedTag);
+
+				// Add Fixed Header Overhead
+				// TAG_NAME_SIZE (2) + TAG_TYPE_SIZE (1) + TAG_LENGTH_SIZE (4)
+				length += 7;
+
+				if ((nestedTag.nestedTags?.length ?? 0) > 0) {
+					// SUBTAG_COUNT_SIZE (2)
+					length += 2;
+				}
 			}
 		}
 
@@ -89,55 +97,6 @@ export class TagEncoder {
 		length += this.calculateValueSize(tag);
 
 		return length;
-	}
-
-	/**
-	 * Calculate the full size of a nested tag (for inclusion in parent's tagLength)
-	 * This includes: name + type + length + [subtag count] + subtag data + value
-	 */
-	private calculateNestedTagFullSize(tag: Tag<any>): number {
-		let size = 0;
-
-		// Tag name
-		if (this.useUtf8Numbers) {
-			const hasSubtags = (tag.nestedTags?.length ?? 0) > 0 ? 1 : 0;
-			const nameAndSubtags = ((tag.name & 0xffff) << 1) | hasSubtags;
-			size += numberLength(nameAndSubtags);
-		} else {
-			size += 2; // uint16
-		}
-
-		// Type (always 1 byte)
-		size += 1;
-
-		// Tag length field
-		if (this.useUtf8Numbers) {
-			size += numberLength(this.calculateTagLength(tag));
-		} else {
-			size += 4; // uint32
-		}
-
-		// Subtag count (only if has subtags)
-		const nestedCount = tag.nestedTags?.length ?? 0;
-		if (nestedCount > 0) {
-			if (this.useUtf8Numbers) {
-				size += numberLength(nestedCount);
-			} else {
-				size += 2; // uint16
-			}
-		}
-
-		// Subtags data (recursively)
-		if (tag.nestedTags) {
-			for (const nestedTag of tag.nestedTags) {
-				size += this.calculateNestedTagFullSize(nestedTag);
-			}
-		}
-
-		// Value
-		size += this.calculateValueSize(tag);
-
-		return size;
 	}
 
 	/**
@@ -214,7 +173,8 @@ export class TagEncoder {
 		currentOffset += 1;
 
 		// Write tag length (subtags + value)
-		const tagLength = this.calculateTagLength(tag);
+		// Use Reported Length (Logical) for the Value
+		const tagLength = this.calculateReportedLength(tag);
 		if (this.useUtf8Numbers) {
 			const encoded = encodeUtf8Number(tagLength);
 			encoded.copy(buffer, currentOffset);
@@ -275,28 +235,28 @@ export class TagEncoder {
 				return offset + encoded.length;
 
 			case ECTagType.EC_TAGTYPE_UINT8:
-				buffer.writeUInt8(tag.value, offset);
+				buffer.writeUInt8(tag.getValue(), offset);
 				return offset + 1;
 
 			case ECTagType.EC_TAGTYPE_UINT16:
-				buffer.writeUInt16BE(tag.value, offset);
+				buffer.writeUInt16BE(tag.getValue(), offset);
 				return offset + 2;
 
 			case ECTagType.EC_TAGTYPE_UINT32:
-				buffer.writeUInt32BE(tag.value, offset);
+				buffer.writeUInt32BE(tag.getValue(), offset);
 				return offset + 4;
 
 			case ECTagType.EC_TAGTYPE_UINT64:
-				buffer.writeBigUInt64BE(tag.value, offset);
+				buffer.writeBigUInt64BE(tag.getValue(), offset);
 				return offset + 8;
 
 			case ECTagType.EC_TAGTYPE_DOUBLE:
-				buffer.writeDoubleBE(tag.value, offset);
+				buffer.writeDoubleBE(tag.getValue(), offset);
 				return offset + 8;
 
 			case ECTagType.EC_TAGTYPE_IPV4:
-				buffer.writeUInt32BE(tag.value.ip, offset);
-				buffer.writeUInt16BE(tag.value.port, offset + 4);
+				buffer.writeUInt32BE(tag.getValue().ip, offset);
+				buffer.writeUInt16BE(tag.getValue().port, offset + 4);
 				return offset + 6;
 
 			case ECTagType.EC_TAGTYPE_UINT128:
