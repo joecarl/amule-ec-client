@@ -61,7 +61,29 @@ async function main() {
 			);
 		}
 
-		// 4. Cleanup: Delete the test category
+		// 4. Update the category (optional, just to test update functionality)
+		if (found) {
+			const newComment = 'Updated comment';
+			console.log('Updating the test category comment...');
+			await client.updateCategory(found.id, {
+				...found,
+				comment: newComment,
+			});
+
+			// Wait for update to process
+			await new Promise((resolve) => setTimeout(resolve, 1000));
+
+			// Verify update
+			const postUpdateCategories = await client.getCategories();
+			const updatedCategory = postUpdateCategories.find((c) => c.id === found?.id);
+			if (updatedCategory && updatedCategory.comment === newComment) {
+				console.log('✅ Update verified: Comment is now:', updatedCategory.comment);
+			} else {
+				console.error('❌ Error: Updated category not found or comment did not update.');
+			}
+		}
+
+		// 5. Cleanup: Delete the test category
 		console.log('Cleaning up: Deleting the test category...');
 		if (found) {
 			await client.deleteCategory(found.id);
@@ -70,7 +92,7 @@ async function main() {
 			console.log('No category to delete.');
 		}
 
-		// 5. Final verification
+		// 6. Final verification
 		const finalCategories = await client.getCategories();
 		console.log(`Final category count: ${finalCategories.length}`);
 	} catch (error) {

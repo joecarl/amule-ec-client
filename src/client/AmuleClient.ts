@@ -245,6 +245,16 @@ export class AmuleClient {
 	}
 
 	/**
+	 * Update a category
+	 */
+	async updateCategory(id: number, category: AmuleCategory): Promise<void> {
+		const { UpdateCategoryRequest } = await import('../request/UpdateCategoryRequest');
+
+		const request = new UpdateCategoryRequest(id, category);
+		await this.connection.sendRequest(request);
+	}
+
+	/**
 	 * Delete a category
 	 */
 	async deleteCategory(id: number): Promise<void> {
