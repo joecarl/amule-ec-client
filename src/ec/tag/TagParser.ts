@@ -190,7 +190,8 @@ export class TagParser {
 			}
 
 			case ECTagType.EC_TAGTYPE_UINT128:
-				return new UInt128Tag(name, value);
+				const numValue = value.length >= 16 ? this.parseUInt128(value) : 0n;
+				return new UInt128Tag(name, numValue);
 
 			case ECTagType.EC_TAGTYPE_STRING: {
 				// Remove null terminator if present
@@ -223,6 +224,13 @@ export class TagParser {
 			default:
 				throw new InvalidECException(`Unknown tag type: ${type} for tag ${name}`);
 		}
+	}
+
+	private parseUInt128(value: Buffer): bigint {
+		if (value.length < 16) {
+			throw new InvalidECException(`UInt128 value must be at least 16 bytes long, got ${value.length}`);
+		}
+		return (value.readBigUInt64BE(0) << 64n) | value.readBigUInt64BE(8);
 	}
 
 	/**

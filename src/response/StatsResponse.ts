@@ -10,28 +10,27 @@ import type { StatsResponse } from '../client/AmuleClient';
 export class StatsResponseParser {
 	static fromPacket(packet: Packet): StatsResponse {
 		// Extract common stats
-		const uploadOverhead = findNumericTag(packet.tags, ECTagName.EC_TAG_STATS_UL_SPEED_OVERHEAD)?.value || 0;
-		const downloadOverhead = findNumericTag(packet.tags, ECTagName.EC_TAG_STATS_DL_SPEED_OVERHEAD)?.value || 0;
-		const bannedCount = findNumericTag(packet.tags, ECTagName.EC_TAG_STATS_BANNED_COUNT)?.value || 0;
+		const uploadOverhead = findNumericTag(packet.tags, ECTagName.EC_TAG_STATS_UP_OVERHEAD)?.getValue() || 0;
+		const downloadOverhead = findNumericTag(packet.tags, ECTagName.EC_TAG_STATS_DOWN_OVERHEAD)?.getValue() || 0;
+		const bannedCount = findNumericTag(packet.tags, ECTagName.EC_TAG_STATS_BANNED_COUNT)?.getValue() || 0;
 
-		const totalSentBytes = findNumericTag(packet.tags, ECTagName.EC_TAG_STATS_TOTAL_SENT_BYTES)?.value || 0;
-		const totalReceivedBytes = findNumericTag(packet.tags, ECTagName.EC_TAG_STATS_TOTAL_RECEIVED_BYTES)?.value || 0;
-		const sharedFileCount = findNumericTag(packet.tags, ECTagName.EC_TAG_STATS_SHARED_FILE_COUNT)?.value || 0;
+		const totalSentBytes = findNumericTag(packet.tags, ECTagName.EC_TAG_STATS_TOTAL_SENT_BYTES)?.getValue() || 0;
+		const totalReceivedBytes = findNumericTag(packet.tags, ECTagName.EC_TAG_STATS_TOTAL_RECEIVED_BYTES)?.getValue() || 0;
+		const sharedFileCount = findNumericTag(packet.tags, ECTagName.EC_TAG_STATS_SHARED_FILE_COUNT)?.getValue() || 0;
 
-		const uploadSpeed = findNumericTag(packet.tags, ECTagName.EC_TAG_STATS_UL_SPEED)?.value || 0;
-		const downloadSpeed = findNumericTag(packet.tags, ECTagName.EC_TAG_STATS_DL_SPEED)?.value || 0;
-		const uploadSpeedLimit = findNumericTag(packet.tags, ECTagName.EC_TAG_STATS_UL_SPEED_LIMIT)?.value || 0;
-		const downloadSpeedLimit = findNumericTag(packet.tags, ECTagName.EC_TAG_STATS_DL_SPEED_LIMIT)?.value || 0;
+		const uploadSpeed = findNumericTag(packet.tags, ECTagName.EC_TAG_STATS_UL_SPEED)?.getValue() || 0;
+		const downloadSpeed = findNumericTag(packet.tags, ECTagName.EC_TAG_STATS_DL_SPEED)?.getValue() || 0;
+		const uploadSpeedLimit = findNumericTag(packet.tags, ECTagName.EC_TAG_STATS_UL_SPEED_LIMIT)?.getValue() || 0;
+		const downloadSpeedLimit = findNumericTag(packet.tags, ECTagName.EC_TAG_STATS_DL_SPEED_LIMIT)?.getValue() || 0;
 
-		const uploadQueueLength = findNumericTag(packet.tags, ECTagName.EC_TAG_STATS_UL_QUEUE_LEN)?.value || 0;
-		const totalSourceCount = findNumericTag(packet.tags, ECTagName.EC_TAG_STATS_TOTAL_SRC_COUNT)?.value || 0;
+		const uploadQueueLength = findNumericTag(packet.tags, ECTagName.EC_TAG_STATS_UL_QUEUE_LEN)?.getValue() || 0;
+		const totalSourceCount = findNumericTag(packet.tags, ECTagName.EC_TAG_STATS_TOTAL_SRC_COUNT)?.getValue() || 0;
+		const ed2kUsers = findNumericTag(packet.tags, ECTagName.EC_TAG_STATS_ED2K_USERS)?.getValue() || 0;
+		const kadUsers = findNumericTag(packet.tags, ECTagName.EC_TAG_STATS_KAD_USERS)?.getValue() || 0;
+		const ed2kFiles = findNumericTag(packet.tags, ECTagName.EC_TAG_STATS_ED2K_FILES)?.getValue() || 0;
+		const kadFiles = findNumericTag(packet.tags, ECTagName.EC_TAG_STATS_KAD_FILES)?.getValue() || 0;
 
-		const ed2kUsers = findNumericTag(packet.tags, ECTagName.EC_TAG_STATS_ED2K_USERS)?.value || 0;
-		const kadUsers = findNumericTag(packet.tags, ECTagName.EC_TAG_STATS_KAD_USERS)?.value || 0;
-		const ed2kFiles = findNumericTag(packet.tags, ECTagName.EC_TAG_STATS_ED2K_FILES)?.value || 0;
-		const kadFiles = findNumericTag(packet.tags, ECTagName.EC_TAG_STATS_KAD_FILES)?.value || 0;
-
-		const kadNodes = findNumericTag(packet.tags, ECTagName.EC_TAG_STATS_KAD_NODES_TOTAL)?.value || 0;
+		const kadNodes = findNumericTag(packet.tags, ECTagName.EC_TAG_STATS_KAD_NODES)?.getValue() || 0;
 
 		// Connection State & Server Info
 		const connStateTag = findTag(packet.tags, ECTagName.EC_TAG_CONNSTATE);
@@ -41,8 +40,8 @@ export class StatsResponseParser {
 		let connectedServer: StatsResponse['connectedServer'];
 
 		if (connStateTag && connStateTag.nestedTags) {
-			ed2kId = Number(findNumericTag(connStateTag.nestedTags, ECTagName.EC_TAG_ED2K_ID)?.value || 0);
-			clientId = Number(findNumericTag(connStateTag.nestedTags, ECTagName.EC_TAG_CLIENT_ID)?.value || 0);
+			ed2kId = Number(findNumericTag(connStateTag.nestedTags, ECTagName.EC_TAG_ED2K_ID)?.getValue() || 0);
+			clientId = Number(findNumericTag(connStateTag.nestedTags, ECTagName.EC_TAG_CLIENT_ID)?.getValue() || 0);
 
 			const kadIdTag = findTag(connStateTag.nestedTags, ECTagName.EC_TAG_KAD_ID);
 			if (kadIdTag && kadIdTag.getValue() !== undefined) {
@@ -69,7 +68,7 @@ export class StatsResponseParser {
 		}
 
 		// Fallback for ID if not in connState
-		const id = clientId || findNumericTag(packet.tags, ECTagName.EC_TAG_CLIENT_ID)?.value || 0;
+		const id = clientId || Number(findNumericTag(packet.tags, ECTagName.EC_TAG_CLIENT_ID)?.getValue() || 0);
 
 		// Logger messages (if any)
 		const loggerMessage: string[] = [];

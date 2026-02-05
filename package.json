@@ -1,6 +1,6 @@
 {
 	"name": "amule-ec-client",
-	"version": "0.3.0",
+	"version": "0.3.1",
 	"description": "A TypeScript client for Amule EC API.",
 	"author": "José Carlos HR <joecarlhr@gmail.com>",
 	"license": "MIT",

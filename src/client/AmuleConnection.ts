@@ -66,7 +66,7 @@ export class AmuleConnection {
 		}
 
 		// Setup event handlers
-		this.socket.on('data', (data) => this.handleData(data));
+		this.socket.on('data', (data) => this.handleData(Buffer.isBuffer(data) ? data : Buffer.from(data)));
 		this.socket.on('error', (error) => this.handleError(error));
 		this.socket.on('timeout', () => this.handleTimeout());
 		this.socket.on('close', () => this.handleClose());

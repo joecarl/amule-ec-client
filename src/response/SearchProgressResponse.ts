@@ -11,7 +11,7 @@ export class SearchProgressResponse {
 
 	static fromPacket(packet: Packet): SearchProgressResponse {
 		const progressTag = findNumericTag(packet.tags, ECTagName.EC_TAG_SEARCH_STATUS);
-		const progress = progressTag ? Number(progressTag.value) / 100.0 : 0;
+		const progress = progressTag ? Number(progressTag.getValue()) / 100.0 : 0;
 
 		return new SearchProgressResponse(progress);
 	}

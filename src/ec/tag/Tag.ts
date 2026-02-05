@@ -6,6 +6,7 @@ export interface NumericTag {
 	getShort(): number;
 	getInt(): number;
 	getLong(): bigint;
+	getValue(): number | bigint;
 }
 
 export abstract class Tag<T> {
@@ -215,14 +216,15 @@ export class ULongTag extends Tag<bigint> implements NumericTag {
 }
 
 export class UInt128Tag extends Tag<bigint> {
-	constructor(name: ECTagName, subtags: Tag<any>[] = [], nameValue: number = name) {
+	constructor(name: ECTagName, value?: bigint, subtags: Tag<any>[] = [], nameValue: number = name) {
 		super(name, ECTagType.EC_TAGTYPE_UINT128, subtags, nameValue);
+		if (value !== undefined) {
+			this.setValue(value);
+		}
 	}
 
 	static withValue(name: ECTagName, value: bigint, subtags: Tag<any>[] = []): UInt128Tag {
-		const tag = new UInt128Tag(name, subtags);
-		tag.setValue(value);
-		return tag;
+		return new UInt128Tag(name, value, subtags);
 	}
 
 	parseValue(value: Buffer): void {
