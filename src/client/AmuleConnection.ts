@@ -7,7 +7,6 @@ import { CommunicationException, ServerException } from '../exceptions';
 import { Packet } from '../ec/packet/Packet';
 import { PacketParser } from '../ec/packet/PacketParser';
 import { PacketWriter } from '../ec/packet/PacketWriter';
-import { Flags } from '../ec/packet/Flags';
 import { ECOpCode } from '../ec/Codes';
 import { AuthClientInfoRequest, AuthPasswordRequest } from '../request/AuthRequest';
 import type { Request } from '../request/Request';
@@ -18,10 +17,11 @@ export class AmuleConnection {
 	private socket?: net.Socket;
 	private connected = false;
 	private buffer: Buffer = Buffer.allocUnsafe(0);
-	private pendingResponse?: {
+	private pendingResponses: {
 		resolve: (packet: Packet) => void;
 		reject: (error: Error) => void;
-	};
+	}[] = [];
+	private connectionPromise?: Promise<void>;
 
 	// Debug logging flag (disabled by default)
 	private debug = false;
@@ -54,30 +54,42 @@ export class AmuleConnection {
 	 * Reconnect to the server
 	 */
 	async reconnect(): Promise<void> {
-		this.connected = false;
-		if (this.socket) {
-			this.socket.destroy();
+		if (this.connectionPromise) {
+			return this.connectionPromise;
 		}
 
-		// Create new socket
-		this.socket = new net.Socket();
-		if (this.timeout > 0) {
-			this.socket.setTimeout(this.timeout);
-		}
+		this.connectionPromise = (async () => {
+			this.connected = false;
+			if (this.socket) {
+				this.socket.destroy();
+			}
 
-		// Setup event handlers
-		this.socket.on('data', (data) => this.handleData(Buffer.isBuffer(data) ? data : Buffer.from(data)));
-		this.socket.on('error', (error) => this.handleError(error));
-		this.socket.on('timeout', () => this.handleTimeout());
-		this.socket.on('close', () => this.handleClose());
+			// Create new socket
+			this.socket = new net.Socket();
+			if (this.timeout > 0) {
+				this.socket.setTimeout(this.timeout);
+			}
 
-		// Connect
-		await this.connectSocket();
+			// Setup event handlers
+			this.socket.on('data', (data) => this.handleData(Buffer.isBuffer(data) ? data : Buffer.from(data)));
+			this.socket.on('error', (error) => this.handleError(error));
+			this.socket.on('timeout', () => this.handleTimeout());
+			this.socket.on('close', () => this.handleClose());
 
-		// Perform authentication
-		await this.authenticate();
+			try {
+				// Connect
+				await this.connectSocket();
 
-		this.connected = true;
+				// Perform authentication
+				await this.authenticate();
+
+				this.connected = true;
+			} finally {
+				this.connectionPromise = undefined;
+			}
+		})();
+
+		return this.connectionPromise;
 	}
 
 	/**
@@ -147,8 +159,8 @@ export class AmuleConnection {
 		// Append to buffer
 		this.buffer = Buffer.concat([this.buffer, data]);
 
-		// Try to parse packet
-		if (PacketParser.hasCompletePacket(this.buffer)) {
+		// Try to parse packets
+		while (PacketParser.hasCompletePacket(this.buffer)) {
 			try {
 				const packet = PacketParser.parse(this.buffer);
 				this.log('Parsed packet, opCode:', packet.opCode);
@@ -158,19 +170,20 @@ export class AmuleConnection {
 				this.buffer = this.buffer.subarray(consumedBytes);
 
 				// Resolve pending response
-				if (this.pendingResponse) {
-					this.pendingResponse.resolve(packet);
-					this.pendingResponse = undefined;
+				const pending = this.pendingResponses.shift();
+				if (pending) {
+					pending.resolve(packet);
 				}
 			} catch (error) {
 				this.log('Parse error:', error);
-				if (this.pendingResponse) {
-					this.pendingResponse.reject(error as Error);
-					this.pendingResponse = undefined;
+				const pending = this.pendingResponses.shift();
+				if (pending) {
+					pending.reject(error as Error);
 				}
+				// If we have a parse error, the buffer might be corrupted for further packets
+				this.buffer = Buffer.allocUnsafe(0);
+				break;
 			}
-		} else {
-			this.log('Incomplete packet, waiting for more data...');
 		}
 	}
 
@@ -179,9 +192,9 @@ export class AmuleConnection {
 	 */
 	private handleError(error: Error): void {
 		this.connected = false;
-		if (this.pendingResponse) {
-			this.pendingResponse.reject(new CommunicationException(`Socket error: ${error.message}`));
-			this.pendingResponse = undefined;
+		while (this.pendingResponses.length > 0) {
+			const pending = this.pendingResponses.shift();
+			pending?.reject(new CommunicationException(`Socket error: ${error.message}`));
 		}
 	}
 
@@ -190,9 +203,9 @@ export class AmuleConnection {
 	 */
 	private handleTimeout(): void {
 		this.connected = false;
-		if (this.pendingResponse) {
-			this.pendingResponse.reject(new CommunicationException('Socket timeout'));
-			this.pendingResponse = undefined;
+		while (this.pendingResponses.length > 0) {
+			const pending = this.pendingResponses.shift();
+			pending?.reject(new CommunicationException('Socket timeout'));
 		}
 	}
 
@@ -200,11 +213,11 @@ export class AmuleConnection {
 	 * Handle socket close
 	 */
 	private handleClose(): void {
-		this.log('Socket closed! connected:', this.connected, 'pendingResponse:', !!this.pendingResponse);
+		this.log('Socket closed! connected:', this.connected, 'pendingResponses:', this.pendingResponses.length);
 		this.connected = false;
-		if (this.pendingResponse) {
-			this.pendingResponse.reject(new CommunicationException('Socket closed'));
-			this.pendingResponse = undefined;
+		while (this.pendingResponses.length > 0) {
+			const pending = this.pendingResponses.shift();
+			pending?.reject(new CommunicationException('Socket closed'));
 		}
 	}
 
@@ -239,7 +252,7 @@ export class AmuleConnection {
 
 		// Create promise for response
 		const responsePromise = new Promise<Packet>((resolve, reject) => {
-			this.pendingResponse = { resolve, reject };
+			this.pendingResponses.push({ resolve, reject });
 		});
 
 		// Send packet
