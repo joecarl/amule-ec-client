@@ -22,7 +22,7 @@ export class PreferencesResponseParser {
 				if (categoryTag.name === ECTagName.EC_TAG_CATEGORY) {
 					const nestedTags = categoryTag.nestedTags || [];
 
-					const idTag = categoryTag; //findNumericTag(nestedTags, ECTagName.EC_TAG_CATEGORY);
+					const idTag = categoryTag;
 					const nameTag = findTag(nestedTags, ECTagName.EC_TAG_CATEGORY_TITLE);
 					const pathTag = findTag(nestedTags, ECTagName.EC_TAG_CATEGORY_PATH);
 					const commentTag = findTag(nestedTags, ECTagName.EC_TAG_CATEGORY_COMMENT);

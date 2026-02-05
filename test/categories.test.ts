@@ -40,7 +40,6 @@ describe('Category Management', () => {
 		it('should correctly parse categories from preferences packet', () => {
 			// Mock a packet that looks like a Preferences response with categories
 			const categorySubtags = [
-				new UIntTag(ECTagName.EC_TAG_CATEGORY, 1),
 				new StringTag(ECTagName.EC_TAG_CATEGORY_TITLE, 'Movies'),
 				new StringTag(ECTagName.EC_TAG_CATEGORY_PATH, '/ext/movies'),
 				new StringTag(ECTagName.EC_TAG_CATEGORY_COMMENT, 'Favorite movies'),
@@ -48,7 +47,7 @@ describe('Category Management', () => {
 				new UByteTag(ECTagName.EC_TAG_CATEGORY_PRIO, 2),
 			];
 
-			const categoryTag = new CustomTag(ECTagName.EC_TAG_CATEGORY, Buffer.alloc(0), categorySubtags);
+			const categoryTag = new UIntTag(ECTagName.EC_TAG_CATEGORY, 1, categorySubtags);
 			const prefsCategoriesTag = new CustomTag(ECTagName.EC_TAG_PREFS_CATEGORIES, Buffer.alloc(0), [categoryTag]);
 
 			const packet = new Packet(ECOpCode.EC_OP_GET_PREFERENCES, Flags.useUtf8Numbers(), [prefsCategoriesTag]);
