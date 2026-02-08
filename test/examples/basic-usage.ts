@@ -41,6 +41,12 @@ async function main() {
 		const shared = await client.getSharedFiles();
 		console.log(`Sharing ${shared.length} files`);
 
+		// Get client ul/dl queue
+		console.log('\n=== Client Upload/Download Queue ===');
+		const clients = await client.getClientQueue();
+		console.log(`${clients.length} clients in queue`);
+		console.log('Clients:', clients);
+
 		console.log('\nDone!');
 	} catch (error) {
 		console.error('Error:', error);

@@ -16,6 +16,6 @@ export class AuthSaltResponse {
 			throw new InvalidECException('Missing salt tag in auth salt response');
 		}
 
-		return new AuthSaltResponse(saltTag.value);
+		return new AuthSaltResponse(saltTag.getLong());
 	}
 }

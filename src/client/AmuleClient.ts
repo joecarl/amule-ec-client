@@ -3,7 +3,7 @@
  */
 
 import { AmuleConnection } from './AmuleConnection';
-import type { AmuleFile, AmuleTransferringFile, AmuleCategory, AmuleServer, DownloadCommand, SearchType } from '../model';
+import type { AmuleFile, AmuleTransferringFile, AmuleCategory, AmuleServer, DownloadCommand, SearchType, AmuleUpDownClient } from '../model';
 import type { SearchFilters } from '../types';
 import { EcPrefs } from '../ec/Codes';
 
@@ -46,14 +46,14 @@ export interface StatsResponse {
 }
 
 export interface SearchResultsResponse {
-	files: Array<{
+	files: {
 		fileName: string;
 		hash: Buffer;
 		sizeFull: number;
 		downloadStatus: number;
 		completeSourceCount: number;
 		sourceCount: number;
-	}>;
+	}[];
 }
 
 export class AmuleClient {
@@ -199,6 +199,19 @@ export class AmuleClient {
 		const packet = await this.connection.sendRequest(request);
 
 		return SharedFilesResponseParser.fromPacket(packet).files;
+	}
+
+	/**
+	 * Get client upload/download queue (clients we are uploading to/downloading from)
+	 */
+	async getClientQueue(): Promise<AmuleUpDownClient[]> {
+		const { ClientQueueRequest } = await import('../request/ClientQueueRequest');
+		const { ClientQueueResponseParser } = await import('../response/ClientQueueResponse');
+
+		const request = new ClientQueueRequest();
+		const packet = await this.connection.sendRequest(request);
+
+		return ClientQueueResponseParser.fromPacket(packet).clients;
 	}
 
 	/**

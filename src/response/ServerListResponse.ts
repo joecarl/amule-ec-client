@@ -5,6 +5,7 @@
 import { Packet } from '../ec/packet/Packet';
 import { ECTagName } from '../ec/Codes';
 import { findNumericTag, findTag } from '../ec/tag/Tag';
+import { formatIp } from './utils';
 import type { AmuleServer } from '../model';
 
 export interface ServerListResponse {
@@ -43,7 +44,7 @@ export class ServerListResponseParser {
 				port =
 					findNumericTag(nested, ECTagName.EC_TAG_SERVER_PORT)?.getInt() || findNumericTag(packet.tags, ECTagName.EC_TAG_SERVER_PORT)?.getInt() || 0;
 
-				ip = this.formatIp(ipNum);
+				ip = formatIp(ipNum);
 			}
 
 			// Some servers might have port in EC_TAG_SERVER_PORT even if IP is in combined tag
@@ -69,11 +70,5 @@ export class ServerListResponseParser {
 		}
 
 		return { servers };
-	}
-
-	private static formatIp(ip: number | undefined): string {
-		if (ip === undefined) return '';
-		// EC protocol uses network byte order (big-endian) for IP addresses in UINT32
-		return [(ip >>> 24) & 0xff, (ip >>> 16) & 0xff, (ip >>> 8) & 0xff, ip & 0xff].join('.');
 	}
 }

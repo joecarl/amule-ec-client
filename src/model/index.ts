@@ -70,6 +70,48 @@ export interface AmuleServer {
 	failedCount: number;
 }
 
+export interface AmuleUpDownClient {
+	id?: number;
+	userHashHexString?: string;
+	userID?: number;
+	clientName?: string;
+	speedUp?: number;
+	speedDown?: number;
+	xferUp?: number;
+	xferDown?: number;
+	xferUpSession?: number;
+	xferDownSession?: number;
+	friendSlot?: boolean;
+	clientSoftware?: number;
+	softVerStr?: string;
+	clientUploadState?: number;
+	clientDownloadState?: number;
+	getSourceFrom?: number;
+	userIP?: string;
+	userPort?: number;
+	serverIP?: string;
+	serverPort?: number;
+	serverName?: string;
+	kadPort?: number;
+	score?: number;
+	waitingPosition?: number;
+	remoteQueueRank?: number;
+	oldRemoteQueueRank?: number;
+	identState?: number;
+	obfuscationStatus?: number;
+	hasExtendedProtocol?: boolean;
+	nextRequestedPart?: number;
+	lastDownloadingPart?: number;
+	uploadFileID?: number;
+	requestFileID?: number;
+	remoteFilename?: string;
+	disableViewShared?: boolean;
+	version?: number;
+	modVersion?: string;
+	osInfo?: string;
+	availableParts?: number;
+}
+
 export enum FileStatus {
 	READY = 0,
 	EMPTY = 1,
