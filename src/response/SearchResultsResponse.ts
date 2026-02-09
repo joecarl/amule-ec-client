@@ -21,9 +21,9 @@ export class SearchResultsResponseParser {
 			const fileNameTag = findTag(nestedTags, ECTagName.EC_TAG_PARTFILE_NAME);
 			const hashTag = findTag(nestedTags, ECTagName.EC_TAG_PARTFILE_HASH);
 			const sizeTag = findNumericTag(nestedTags, ECTagName.EC_TAG_PARTFILE_SIZE_FULL);
-			const completeSourcesTag = findNumericTag(nestedTags, ECTagName.EC_TAG_PARTFILE_SOURCE_COUNT);
-			const sourceCountTag = findNumericTag(nestedTags, ECTagName.EC_TAG_PARTFILE_SOURCE_COUNT_XFER);
-			const downloadStatusTag = findNumericTag(nestedTags, ECTagName.EC_TAG_KNOWNFILE);
+			const sourceCountTag = findNumericTag(nestedTags, ECTagName.EC_TAG_PARTFILE_SOURCE_COUNT);
+			const completeSourcesTag = findNumericTag(nestedTags, ECTagName.EC_TAG_PARTFILE_SOURCE_COUNT_XFER);
+			const downloadStatusTag = findNumericTag(nestedTags, ECTagName.EC_TAG_PARTFILE_STATUS);
 
 			if (fileNameTag && hashTag) {
 				files.push({

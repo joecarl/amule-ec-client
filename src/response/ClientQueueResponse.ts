@@ -29,54 +29,50 @@ export class ClientQueueResponseParser {
 			const tags = clientTag.nestedTags || [];
 
 			const client: AmuleUpDownClient = {
+				clientName: findTag(tags, ECTagName.EC_TAG_CLIENT_NAME)?.getValue(),
 				userHashHexString: findTag(tags, ECTagName.EC_TAG_CLIENT_HASH)?.getValue().toString('hex'),
 				userID: findNumericTag(tags, ECTagName.EC_TAG_CLIENT_USER_ID)?.getInt(),
-
-				clientName: findTag(tags, ECTagName.EC_TAG_CLIENT_NAME)?.getValue(),
-				speedUp: toNumber(findNumericTag(tags, ECTagName.EC_TAG_CLIENT_UP_SPEED)?.getLong()),
-				speedDown: toNumber(findNumericTag(tags, ECTagName.EC_TAG_CLIENT_DOWN_SPEED)?.getLong()),
-
-				xferUp: toNumber(findNumericTag(tags, ECTagName.EC_TAG_CLIENT_UPLOAD_TOTAL)?.getLong()),
-				xferDown: toNumber(findNumericTag(tags, ECTagName.EC_TAG_CLIENT_DOWNLOAD_TOTAL)?.getLong()),
-				xferUpSession: toNumber(findNumericTag(tags, ECTagName.EC_TAG_CLIENT_UPLOAD_SESSION)?.getLong()),
-				xferDownSession: toNumber(findNumericTag(tags, ECTagName.EC_TAG_PARTFILE_SIZE_XFER)?.getLong()),
-
-				friendSlot: findNumericTag(tags, ECTagName.EC_TAG_CLIENT_FRIEND_SLOT)?.getInt() !== 0,
-
-				clientSoftware: findNumericTag(tags, ECTagName.EC_TAG_CLIENT_SOFTWARE)?.getInt(),
+				score: findNumericTag(tags, ECTagName.EC_TAG_CLIENT_SCORE)?.getInt(),
+				software: findTag(tags, ECTagName.EC_TAG_CLIENT_SOFTWARE)?.getValue(),
 				softVerStr: findTag(tags, ECTagName.EC_TAG_CLIENT_SOFT_VER_STR)?.getValue(),
-
-				clientUploadState: findNumericTag(tags, ECTagName.EC_TAG_CLIENT_UPLOAD_STATE)?.getInt(),
-				clientDownloadState: findNumericTag(tags, ECTagName.EC_TAG_CLIENT_DOWNLOAD_STATE)?.getInt(),
-
-				getSourceFrom: findNumericTag(tags, ECTagName.EC_TAG_CLIENT_FROM)?.getInt(),
-
 				userIP: formatIp(findNumericTag(tags, ECTagName.EC_TAG_CLIENT_USER_IP)?.getInt()),
 				userPort: findNumericTag(tags, ECTagName.EC_TAG_CLIENT_USER_PORT)?.getInt(),
+				sourceFrom: toNumber(findNumericTag(tags, ECTagName.EC_TAG_CLIENT_FROM)?.getLong()),
 				serverIP: formatIp(findNumericTag(tags, ECTagName.EC_TAG_CLIENT_SERVER_IP)?.getInt()),
 				serverPort: findNumericTag(tags, ECTagName.EC_TAG_CLIENT_SERVER_PORT)?.getInt(),
 				serverName: findTag(tags, ECTagName.EC_TAG_CLIENT_SERVER_NAME)?.getValue(),
-				kadPort: findNumericTag(tags, ECTagName.EC_TAG_CLIENT_KAD_PORT)?.getInt(),
 
-				score: findNumericTag(tags, ECTagName.EC_TAG_CLIENT_SCORE)?.getInt(),
+				upSpeed: toNumber(findNumericTag(tags, ECTagName.EC_TAG_CLIENT_UP_SPEED)?.getLong()),
+				downSpeed: toNumber(findNumericTag(tags, ECTagName.EC_TAG_CLIENT_DOWN_SPEED)?.getLong()),
+				uploadSession: toNumber(findNumericTag(tags, ECTagName.EC_TAG_CLIENT_UPLOAD_SESSION)?.getLong()),
+				transferredDown: toNumber(findNumericTag(tags, ECTagName.EC_TAG_PARTFILE_SIZE_XFER)?.getLong()),
+				uploadedTotal: toNumber(findNumericTag(tags, ECTagName.EC_TAG_CLIENT_UPLOAD_TOTAL)?.getLong()),
+				downloadedTotal: toNumber(findNumericTag(tags, ECTagName.EC_TAG_CLIENT_DOWNLOAD_TOTAL)?.getLong()),
+
+				uploadState: findNumericTag(tags, ECTagName.EC_TAG_CLIENT_UPLOAD_STATE)?.getInt(),
+				downloadState: findNumericTag(tags, ECTagName.EC_TAG_CLIENT_DOWNLOAD_STATE)?.getInt(),
+				identState: findNumericTag(tags, ECTagName.EC_TAG_CLIENT_IDENT_STATE)?.getInt(),
+				extProtocol: findNumericTag(tags, ECTagName.EC_TAG_CLIENT_EXT_PROTOCOL)?.getInt(),
 				waitingPosition: findNumericTag(tags, ECTagName.EC_TAG_CLIENT_WAITING_POSITION)?.getInt(),
 				remoteQueueRank: findNumericTag(tags, ECTagName.EC_TAG_CLIENT_REMOTE_QUEUE_RANK)?.getInt(),
 				oldRemoteQueueRank: findNumericTag(tags, ECTagName.EC_TAG_CLIENT_OLD_REMOTE_QUEUE_RANK)?.getInt(),
-
-				identState: findNumericTag(tags, ECTagName.EC_TAG_CLIENT_IDENT_STATE)?.getInt(),
 				obfuscationStatus: findNumericTag(tags, ECTagName.EC_TAG_CLIENT_OBFUSCATION_STATUS)?.getInt(),
-				hasExtendedProtocol: findNumericTag(tags, ECTagName.EC_TAG_CLIENT_EXT_PROTOCOL)?.getInt() !== 0,
-				nextRequestedPart: findNumericTag(tags, ECTagName.EC_TAG_CLIENT_NEXT_REQUESTED_PART)?.getInt(),
-				lastDownloadingPart: findNumericTag(tags, ECTagName.EC_TAG_CLIENT_LAST_DOWNLOADING_PART)?.getInt(),
-
-				uploadFileID: findNumericTag(tags, ECTagName.EC_TAG_CLIENT_UPLOAD_FILE)?.getInt(),
-				requestFileID: findNumericTag(tags, ECTagName.EC_TAG_CLIENT_REQUEST_FILE)?.getInt(),
+				kadPort: findNumericTag(tags, ECTagName.EC_TAG_CLIENT_KAD_PORT)?.getInt(),
+				friendSlot: findNumericTag(tags, ECTagName.EC_TAG_CLIENT_FRIEND_SLOT)?.getInt(),
+				uploadFileId: toNumber(findNumericTag(tags, ECTagName.EC_TAG_CLIENT_UPLOAD_FILE)?.getLong()),
+				uploadFilename: findTag(tags, ECTagName.EC_TAG_PARTFILE_NAME)?.getValue(),
+				requestFileId: toNumber(findNumericTag(tags, ECTagName.EC_TAG_CLIENT_REQUEST_FILE)?.getLong()),
 				remoteFilename: findTag(tags, ECTagName.EC_TAG_CLIENT_REMOTE_FILENAME)?.getValue(),
-				disableViewShared: findNumericTag(tags, ECTagName.EC_TAG_CLIENT_DISABLE_VIEW_SHARED)?.getInt() !== 0,
+				disableViewShared: !!findNumericTag(tags, ECTagName.EC_TAG_CLIENT_DISABLE_VIEW_SHARED)?.getInt(),
 				version: findNumericTag(tags, ECTagName.EC_TAG_CLIENT_VERSION)?.getInt(),
 				modVersion: findTag(tags, ECTagName.EC_TAG_CLIENT_MOD_VERSION)?.getValue(),
 				osInfo: findTag(tags, ECTagName.EC_TAG_CLIENT_OS_INFO)?.getValue(),
 				availableParts: findNumericTag(tags, ECTagName.EC_TAG_CLIENT_AVAILABLE_PARTS)?.getInt(),
+				partStatus: findTag(tags, ECTagName.EC_TAG_CLIENT_PART_STATUS)?.getValue(),
+				nextRequestedPart: findNumericTag(tags, ECTagName.EC_TAG_CLIENT_NEXT_REQUESTED_PART)?.getInt(),
+				lastDownloadingPart: findNumericTag(tags, ECTagName.EC_TAG_CLIENT_LAST_DOWNLOADING_PART)?.getInt(),
+				uploadPartStatus: findTag(tags, ECTagName.EC_TAG_CLIENT_UPLOAD_PART_STATUS)?.getValue(),
+				// Additional fields can be added here as needed
 			};
 
 			clients.push(client);

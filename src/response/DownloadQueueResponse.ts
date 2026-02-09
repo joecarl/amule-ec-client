@@ -30,6 +30,17 @@ export class DownloadQueueResponseParser {
 			const hashTag = findTag(tags, ECTagName.EC_TAG_PARTFILE_HASH);
 			const fileNameTag = findTag(tags, ECTagName.EC_TAG_PARTFILE_NAME);
 
+			const a4afSources: number[] = [];
+			const a4afSourcesTag = findTag(tags, ECTagName.EC_TAG_PARTFILE_A4AF_SOURCES);
+			if (a4afSourcesTag) {
+				a4afSourcesTag.nestedTags = a4afSourcesTag.nestedTags || [];
+				for (const sourceTag of a4afSourcesTag.nestedTags) {
+					if (sourceTag.name === ECTagName.EC_TAG_ECID) {
+						a4afSources.push(sourceTag.getValue());
+					}
+				}
+			}
+
 			// Basic file info
 			const file: AmuleTransferringFile = {
 				fileHashHexString: hashTag ? hashTag.getValue().toString('hex') : undefined,
@@ -77,6 +88,7 @@ export class DownloadQueueResponseParser {
 				getOnQueue: findNumericTag(tags, ECTagName.EC_TAG_KNOWNFILE_ON_QUEUE)?.getShort() ?? 0,
 				getComment: findTag(tags, ECTagName.EC_TAG_KNOWNFILE_COMMENT)?.getValue(),
 				getRating: findNumericTag(tags, ECTagName.EC_TAG_KNOWNFILE_RATING)?.getInt(),
+				a4afSources,
 			};
 
 			files.push(file);

@@ -43,6 +43,7 @@ export interface AmuleTransferringFile extends AmuleFile {
 	getLostDueToCorruption: number;
 	getGainDueToCompression: number;
 	totalPacketsSavedDueToICH: number;
+	a4afSources: number[];
 }
 
 export interface AmuleCategory {
@@ -71,45 +72,49 @@ export interface AmuleServer {
 }
 
 export interface AmuleUpDownClient {
-	id?: number;
+	clientName?: string;
 	userHashHexString?: string;
 	userID?: number;
-	clientName?: string;
-	speedUp?: number;
-	speedDown?: number;
-	xferUp?: number;
-	xferDown?: number;
-	xferUpSession?: number;
-	xferDownSession?: number;
-	friendSlot?: boolean;
-	clientSoftware?: number;
+	score?: number;
+	software?: string;
 	softVerStr?: string;
-	clientUploadState?: number;
-	clientDownloadState?: number;
-	getSourceFrom?: number;
 	userIP?: string;
 	userPort?: number;
+	sourceFrom?: number;
 	serverIP?: string;
 	serverPort?: number;
 	serverName?: string;
-	kadPort?: number;
-	score?: number;
+
+	upSpeed?: number;
+	downSpeed?: number;
+	uploadSession?: number;
+	transferredDown?: number;
+	uploadedTotal?: number;
+	downloadedTotal?: number;
+
+	uploadState?: number;
+	downloadState?: number;
+	identState?: number;
+	extProtocol?: number;
 	waitingPosition?: number;
 	remoteQueueRank?: number;
 	oldRemoteQueueRank?: number;
-	identState?: number;
 	obfuscationStatus?: number;
-	hasExtendedProtocol?: boolean;
-	nextRequestedPart?: number;
-	lastDownloadingPart?: number;
-	uploadFileID?: number;
-	requestFileID?: number;
+	kadPort?: number;
+	friendSlot?: number;
+	uploadFileId?: bigint | number;
+	uploadFilename?: string;
+	requestFileId?: bigint | number;
 	remoteFilename?: string;
-	disableViewShared?: boolean;
+	disableViewShared: boolean;
 	version?: number;
 	modVersion?: string;
 	osInfo?: string;
 	availableParts?: number;
+	partStatus?: string;
+	nextRequestedPart?: number;
+	lastDownloadingPart?: number;
+	uploadPartStatus?: string;
 }
 
 export enum FileStatus {
