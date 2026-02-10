@@ -30,14 +30,16 @@ async function main() {
 		const testCategoryName = `Test_${Date.now()}`;
 		console.log(`Creating category: ${testCategoryName}...`);
 
-		await client.createCategory({
+		const newCategory = {
 			id: 0, // aMule will assign an ID
 			name: testCategoryName,
 			path: '',
 			comment: 'Created by integration test',
-			color: 0x23,
-			priority: 0, // Default
-		});
+			color: 0x01234560,
+			priority: 8,
+		};
+
+		await client.createCategory(newCategory);
 
 		// Wait a moment for aMule to process
 		await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -48,10 +50,16 @@ async function main() {
 
 		const found = updatedCategories.find((c) => c.name === testCategoryName);
 		if (found) {
-			console.log('✅ Success: Category found in the list!');
-			console.log(`   Internal ID: ${found.id}`);
-			console.log(`   Path: ${found.path}`);
-			console.log(`   Comment: ${found.comment}`);
+			if (found.comment === newCategory.comment && found.color === newCategory.color && found.priority === newCategory.priority) {
+				console.log('✅ Success: Category found and properties match expected values.');
+				console.log(`   Internal ID: ${found.id}`);
+				console.log(`   Path: ${found.path}`);
+				console.log(`   Comment: ${found.comment}`);
+			} else {
+				console.error('❌ Error: Category properties do not match expected values.');
+				console.log('Expected:', newCategory);
+				console.log('Found:', found);
+			}
 		} else {
 			console.error('❌ Error: Category not found after creation.');
 			// Let's print the categories we found

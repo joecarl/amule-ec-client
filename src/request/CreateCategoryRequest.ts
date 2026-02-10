@@ -15,8 +15,8 @@ export class CreateCategoryRequest extends Request {
 			new StringTag(ECTagName.EC_TAG_CATEGORY_TITLE, category.name),
 			new StringTag(ECTagName.EC_TAG_CATEGORY_PATH, category.path),
 			new StringTag(ECTagName.EC_TAG_CATEGORY_COMMENT, category.comment),
-			new UByteTag(ECTagName.EC_TAG_CATEGORY_COLOR, category.color),
-			new UIntTag(ECTagName.EC_TAG_CATEGORY_PRIO, category.priority),
+			new UIntTag(ECTagName.EC_TAG_CATEGORY_COLOR, category.color),
+			new UByteTag(ECTagName.EC_TAG_CATEGORY_PRIO, category.priority),
 		];
 
 		// Category tag is a container for all category properties
