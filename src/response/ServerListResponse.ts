@@ -14,10 +14,14 @@ export interface ServerListResponse {
 
 export class ServerListResponseParser {
 	static fromPacket(packet: Packet): ServerListResponse {
+		return this.fromTags(packet.tags);
+	}
+
+	static fromTags(allTags: any[]): ServerListResponse {
 		const servers: AmuleServer[] = [];
 
 		// Find all server tags
-		const serverTags = packet.tags.filter((tag) => tag.name === ECTagName.EC_TAG_SERVER);
+		const serverTags = allTags.filter((tag) => tag.name === ECTagName.EC_TAG_SERVER);
 
 		for (const serverTag of serverTags) {
 			const nested = serverTag.nestedTags || [];
@@ -39,10 +43,9 @@ export class ServerListResponseParser {
 				port = val.port;
 			} else {
 				// Fallback to separate tags if not combined or if top-level
-				const ipNum = findNumericTag(nested, ECTagName.EC_TAG_SERVER_IP)?.getInt() || findNumericTag(packet.tags, ECTagName.EC_TAG_SERVER_IP)?.getInt();
+				const ipNum = findNumericTag(nested, ECTagName.EC_TAG_SERVER_IP)?.getInt() || findNumericTag(allTags, ECTagName.EC_TAG_SERVER_IP)?.getInt();
 
-				port =
-					findNumericTag(nested, ECTagName.EC_TAG_SERVER_PORT)?.getInt() || findNumericTag(packet.tags, ECTagName.EC_TAG_SERVER_PORT)?.getInt() || 0;
+				port = findNumericTag(nested, ECTagName.EC_TAG_SERVER_PORT)?.getInt() || findNumericTag(allTags, ECTagName.EC_TAG_SERVER_PORT)?.getInt() || 0;
 
 				ip = formatIp(ipNum);
 			}

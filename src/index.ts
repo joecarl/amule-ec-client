@@ -8,7 +8,7 @@
 
 // Main client
 export { AmuleClient } from './client/AmuleClient';
-export type { AmuleClientOptions, StatsResponse, SearchResultsResponse } from './client/AmuleClient';
+export type { AmuleClientOptions, StatsResponse, SearchResultsResponse, UpdateResponse } from './client/AmuleClient';
 
 // Models
 export * from './model';

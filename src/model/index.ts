@@ -117,6 +117,16 @@ export interface AmuleUpDownClient {
 	uploadPartStatus?: string;
 }
 
+export interface AmuleFriend {
+	name?: string;
+	userHashHexString?: string;
+	ip?: string;
+	port?: number;
+	friendSlot: boolean;
+	shared: boolean;
+	client?: AmuleUpDownClient;
+}
+
 export enum FileStatus {
 	READY = 0,
 	EMPTY = 1,

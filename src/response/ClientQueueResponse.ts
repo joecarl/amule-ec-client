@@ -20,10 +20,14 @@ function toNumber(value: bigint | number | undefined, defaultValue: number = 0):
 
 export class ClientQueueResponseParser {
 	static fromPacket(packet: Packet): ClientQueueResponse {
+		return this.fromTags(packet.tags);
+	}
+
+	static fromTags(allTags: any[]): ClientQueueResponse {
 		const clients: AmuleUpDownClient[] = [];
 
 		// Find all client tags
-		const clientTags = packet.tags.filter((tag) => tag.name === ECTagName.EC_TAG_CLIENT);
+		const clientTags = allTags.filter((tag) => tag.name === ECTagName.EC_TAG_CLIENT);
 
 		for (const clientTag of clientTags) {
 			const tags = clientTag.nestedTags || [];

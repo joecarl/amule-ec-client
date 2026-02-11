@@ -3,9 +3,9 @@
  */
 
 import { AmuleConnection } from './AmuleConnection';
-import type { AmuleFile, AmuleTransferringFile, AmuleCategory, AmuleServer, DownloadCommand, SearchType, AmuleUpDownClient } from '../model';
+import type { AmuleFile, AmuleTransferringFile, AmuleCategory, AmuleServer, DownloadCommand, SearchType, AmuleUpDownClient, AmuleFriend } from '../model';
 import type { SearchFilters } from '../types';
-import { EcPrefs } from '../ec/Codes';
+import { EcPrefs, ECDetailLevel } from '../ec/Codes';
 
 export interface AmuleClientOptions {
 	host: string;
@@ -56,6 +56,14 @@ export interface SearchResultsResponse {
 	}[];
 }
 
+export interface UpdateResponse {
+	sharedFiles: AmuleFile[];
+	downloadQueue: AmuleTransferringFile[];
+	clients: AmuleUpDownClient[];
+	servers: AmuleServer[];
+	friends: AmuleFriend[];
+}
+
 export class AmuleClient {
 	private connection: AmuleConnection;
 
@@ -81,6 +89,19 @@ export class AmuleClient {
 		const packet = await this.connection.sendRequest(request);
 
 		return StatsResponseParser.fromPacket(packet);
+	}
+
+	/**
+	 * Get incremental updates for files, clients, servers, and friends
+	 */
+	async getUpdate(detailLevel: ECDetailLevel = ECDetailLevel.EC_DETAIL_INC_UPDATE): Promise<UpdateResponse> {
+		const { UpdateRequest } = await import('../request/UpdateRequest');
+		const { UpdateResponseParser } = await import('../response/UpdateResponse');
+
+		const request = new UpdateRequest(detailLevel);
+		const packet = await this.connection.sendRequest(request);
+
+		return UpdateResponseParser.fromPacket(packet);
 	}
 
 	/**
