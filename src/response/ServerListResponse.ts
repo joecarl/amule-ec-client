@@ -5,7 +5,7 @@
 import { Packet } from '../ec/packet/Packet';
 import { ECTagName } from '../ec/Codes';
 import { findNumericTag, findTag } from '../ec/tag/Tag';
-import { formatIp } from './utils';
+import { formatIp, toOptionalBool } from './utils';
 import type { AmuleServer } from '../model';
 
 export interface ServerListResponse {
@@ -34,8 +34,8 @@ export class ServerListResponseParser {
 				findTag(nested, ECTagName.EC_TAG_SERVER_ADDRESS) ||
 				(serverTag.constructor.name.includes('Ipv4') ? serverTag : null);
 
-			let ip = '';
-			let port = 0;
+			let ip: string | undefined = undefined;
+			let port: number | undefined = undefined;
 
 			if (ipv4Tag && ipv4Tag.getValue() && typeof ipv4Tag.getValue() === 'object' && 'address' in (ipv4Tag.getValue() as any)) {
 				const val = ipv4Tag.getValue() as any;
@@ -45,18 +45,19 @@ export class ServerListResponseParser {
 				// Fallback to separate tags if not combined or if top-level
 				const ipNum = findNumericTag(nested, ECTagName.EC_TAG_SERVER_IP)?.getInt() || findNumericTag(allTags, ECTagName.EC_TAG_SERVER_IP)?.getInt();
 
-				port = findNumericTag(nested, ECTagName.EC_TAG_SERVER_PORT)?.getInt() || findNumericTag(allTags, ECTagName.EC_TAG_SERVER_PORT)?.getInt() || 0;
+				port = findNumericTag(nested, ECTagName.EC_TAG_SERVER_PORT)?.getInt() || findNumericTag(allTags, ECTagName.EC_TAG_SERVER_PORT)?.getInt();
 
-				ip = formatIp(ipNum);
+				ip = ipNum !== undefined ? formatIp(ipNum) : undefined;
 			}
 
 			// Some servers might have port in EC_TAG_SERVER_PORT even if IP is in combined tag
-			if (port === 0) {
-				port = findNumericTag(nested, ECTagName.EC_TAG_SERVER_PORT)?.getInt() || 0;
+			if (port === undefined || port === 0) {
+				const extraPort = findNumericTag(nested, ECTagName.EC_TAG_SERVER_PORT)?.getInt();
+				if (extraPort !== undefined) port = extraPort;
 			}
 
 			servers.push({
-				name: findTag(nested, ECTagName.EC_TAG_SERVER_NAME)?.getValue() || 'Unknown',
+				name: findTag(nested, ECTagName.EC_TAG_SERVER_NAME)?.getValue(),
 				description: findTag(nested, ECTagName.EC_TAG_SERVER_DESC)?.getValue(),
 				address: findTag(nested, ECTagName.EC_TAG_SERVER_ADDRESS)?.getValue(),
 				ip: ip,
@@ -65,10 +66,10 @@ export class ServerListResponseParser {
 				users: findNumericTag(nested, ECTagName.EC_TAG_SERVER_USERS)?.getInt(),
 				maxUsers: findNumericTag(nested, ECTagName.EC_TAG_SERVER_USERS_MAX)?.getInt(),
 				files: findNumericTag(nested, ECTagName.EC_TAG_SERVER_FILES)?.getInt(),
-				priority: findNumericTag(nested, ECTagName.EC_TAG_SERVER_PRIO)?.getInt() || 0,
+				priority: findNumericTag(nested, ECTagName.EC_TAG_SERVER_PRIO)?.getInt(),
 				version: findTag(nested, ECTagName.EC_TAG_SERVER_VERSION)?.getValue(),
-				isStatic: !!findNumericTag(nested, ECTagName.EC_TAG_SERVER_STATIC)?.getInt(),
-				failedCount: findNumericTag(nested, ECTagName.EC_TAG_SERVER_FAILED)?.getInt() || 0,
+				isStatic: toOptionalBool(findNumericTag(nested, ECTagName.EC_TAG_SERVER_STATIC)?.getInt()),
+				failedCount: findNumericTag(nested, ECTagName.EC_TAG_SERVER_FAILED)?.getInt(),
 			});
 		}
 

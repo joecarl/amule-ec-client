@@ -5,7 +5,7 @@
 import { Packet } from '../ec/packet/Packet';
 import { ECTagName } from '../ec/Codes';
 import { findTag, findNumericTag } from '../ec/tag/Tag';
-import { formatIp } from './utils';
+import { toOptionalBool, toOptionalIp } from './utils';
 import type { AmuleFile, AmuleTransferringFile, AmuleUpDownClient, AmuleServer, AmuleFriend } from '../model';
 import { SharedFilesResponseParser } from './SharedFilesResponse';
 import { DownloadQueueResponseParser } from './DownloadQueueResponse';
@@ -54,10 +54,10 @@ export class UpdateResponseParser {
 			friends.push({
 				name: findTag(nested, ECTagName.EC_TAG_FRIEND_NAME)?.getValue(),
 				userHashHexString: findTag(nested, ECTagName.EC_TAG_FRIEND_HASH)?.getValue()?.toString('hex'),
-				ip: formatIp(findNumericTag(nested, ECTagName.EC_TAG_FRIEND_IP)?.getInt()),
+				ip: toOptionalIp(findNumericTag(nested, ECTagName.EC_TAG_FRIEND_IP)?.getInt()),
 				port: findNumericTag(nested, ECTagName.EC_TAG_FRIEND_PORT)?.getInt(),
-				friendSlot: !!findNumericTag(nested, ECTagName.EC_TAG_FRIEND_FRIENDSLOT)?.getInt(),
-				shared: !!findNumericTag(nested, ECTagName.EC_TAG_FRIEND_SHARED)?.getInt(),
+				friendSlot: toOptionalBool(findNumericTag(nested, ECTagName.EC_TAG_FRIEND_FRIENDSLOT)?.getInt()),
+				shared: toOptionalBool(findNumericTag(nested, ECTagName.EC_TAG_FRIEND_SHARED)?.getInt()),
 				// Friend client information might be nested as a client tag
 				client: ClientQueueResponseParser.fromTags(nested).clients[0],
 			});

@@ -6,17 +6,17 @@ export interface AmuleFile {
 	filePath?: string;
 	sizeFull?: number;
 	fileEd2kLink?: string;
-	upPrio: number;
-	getRequests: number;
-	getAllRequests: number;
-	getAccepts: number;
-	getAllAccepts: number;
-	getXferred: number;
-	getAllXferred: number;
-	getCompleteSourcesLow: number;
-	getCompleteSourcesHigh: number;
-	getCompleteSources: number;
-	getOnQueue: number;
+	upPrio?: number;
+	getRequests?: number;
+	getAllRequests?: number;
+	getAccepts?: number;
+	getAllAccepts?: number;
+	getXferred?: number;
+	getAllXferred?: number;
+	getCompleteSourcesLow?: number;
+	getCompleteSourcesHigh?: number;
+	getCompleteSources?: number;
+	getOnQueue?: number;
 	getComment?: string;
 	getRating?: number;
 }
@@ -25,50 +25,50 @@ export interface AmuleTransferringFile extends AmuleFile {
 	partMetID?: number;
 	sizeXfer?: number;
 	sizeDone?: number;
-	fileStatus: FileStatus;
-	stopped: boolean;
-	sourceCount: number;
-	sourceNotCurrCount: number;
-	sourceXferCount: number;
-	sourceCountA4AF: number;
+	fileStatus?: FileStatus;
+	stopped?: boolean;
+	sourceCount?: number;
+	sourceNotCurrCount?: number;
+	sourceXferCount?: number;
+	sourceCountA4AF?: number;
 	speed?: number;
-	downPrio: number;
-	fileCat: number;
-	lastSeenComplete: number;
-	lastDateChanged: number;
-	downloadActiveTime: number;
-	availablePartCount: number;
-	a4AFAuto: boolean;
-	hashingProgress: boolean;
-	getLostDueToCorruption: number;
-	getGainDueToCompression: number;
-	totalPacketsSavedDueToICH: number;
-	a4afSources: number[];
+	downPrio?: number;
+	fileCat?: number;
+	lastSeenComplete?: number;
+	lastDateChanged?: number;
+	downloadActiveTime?: number;
+	availablePartCount?: number;
+	a4AFAuto?: boolean;
+	hashingProgress?: boolean;
+	getLostDueToCorruption?: number;
+	getGainDueToCompression?: number;
+	totalPacketsSavedDueToICH?: number;
+	a4afSources?: number[];
 }
 
 export interface AmuleCategory {
-	id: number;
-	name: string;
-	path: string;
-	comment: string;
-	color: number;
-	priority: number;
+	id?: number;
+	name?: string;
+	path?: string;
+	comment?: string;
+	color?: number;
+	priority?: number;
 }
 
 export interface AmuleServer {
 	name?: string;
 	description?: string;
 	address?: string; // String representation usually
-	ip: string;
-	port: number;
+	ip?: string;
+	port?: number;
 	ping?: number;
 	users?: number;
 	maxUsers?: number;
 	files?: number;
-	priority: number;
+	priority?: number;
 	version?: string;
-	isStatic: boolean;
-	failedCount: number;
+	isStatic?: boolean;
+	failedCount?: number;
 }
 
 export interface AmuleUpDownClient {
@@ -106,7 +106,7 @@ export interface AmuleUpDownClient {
 	uploadFilename?: string;
 	requestFileId?: bigint | number;
 	remoteFilename?: string;
-	disableViewShared: boolean;
+	disableViewShared?: boolean;
 	version?: number;
 	modVersion?: string;
 	osInfo?: string;
@@ -122,8 +122,8 @@ export interface AmuleFriend {
 	userHashHexString?: string;
 	ip?: string;
 	port?: number;
-	friendSlot: boolean;
-	shared: boolean;
+	friendSlot?: boolean;
+	shared?: boolean;
 	client?: AmuleUpDownClient;
 }
 

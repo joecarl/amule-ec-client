@@ -5,17 +5,11 @@
 import { Packet } from '../ec/packet/Packet';
 import { ECTagName } from '../ec/Codes';
 import { findNumericTag, findTag } from '../ec/tag/Tag';
-import { formatIp } from './utils';
+import { toOptionalBool, toOptionalIp, toOptionalNumber } from './utils';
 import { AmuleUpDownClient } from '../model';
 
 export interface ClientQueueResponse {
 	clients: AmuleUpDownClient[];
-}
-
-// Helper to convert bigint to number safely
-function toNumber(value: bigint | number | undefined, defaultValue: number = 0): number {
-	if (value === undefined) return defaultValue;
-	return typeof value === 'bigint' ? Number(value) : value;
 }
 
 export class ClientQueueResponseParser {
@@ -34,24 +28,24 @@ export class ClientQueueResponseParser {
 
 			const client: AmuleUpDownClient = {
 				clientName: findTag(tags, ECTagName.EC_TAG_CLIENT_NAME)?.getValue(),
-				userHashHexString: findTag(tags, ECTagName.EC_TAG_CLIENT_HASH)?.getValue().toString('hex'),
+				userHashHexString: findTag(tags, ECTagName.EC_TAG_CLIENT_HASH)?.getValue()?.toString('hex'),
 				userID: findNumericTag(tags, ECTagName.EC_TAG_CLIENT_USER_ID)?.getInt(),
 				score: findNumericTag(tags, ECTagName.EC_TAG_CLIENT_SCORE)?.getInt(),
 				software: findTag(tags, ECTagName.EC_TAG_CLIENT_SOFTWARE)?.getValue(),
 				softVerStr: findTag(tags, ECTagName.EC_TAG_CLIENT_SOFT_VER_STR)?.getValue(),
-				userIP: formatIp(findNumericTag(tags, ECTagName.EC_TAG_CLIENT_USER_IP)?.getInt()),
+				userIP: toOptionalIp(findNumericTag(tags, ECTagName.EC_TAG_CLIENT_USER_IP)?.getInt()),
 				userPort: findNumericTag(tags, ECTagName.EC_TAG_CLIENT_USER_PORT)?.getInt(),
-				sourceFrom: toNumber(findNumericTag(tags, ECTagName.EC_TAG_CLIENT_FROM)?.getLong()),
-				serverIP: formatIp(findNumericTag(tags, ECTagName.EC_TAG_CLIENT_SERVER_IP)?.getInt()),
+				sourceFrom: toOptionalNumber(findNumericTag(tags, ECTagName.EC_TAG_CLIENT_FROM)?.getLong()),
+				serverIP: toOptionalIp(findNumericTag(tags, ECTagName.EC_TAG_CLIENT_SERVER_IP)?.getInt()),
 				serverPort: findNumericTag(tags, ECTagName.EC_TAG_CLIENT_SERVER_PORT)?.getInt(),
 				serverName: findTag(tags, ECTagName.EC_TAG_CLIENT_SERVER_NAME)?.getValue(),
 
-				upSpeed: toNumber(findNumericTag(tags, ECTagName.EC_TAG_CLIENT_UP_SPEED)?.getLong()),
-				downSpeed: toNumber(findNumericTag(tags, ECTagName.EC_TAG_CLIENT_DOWN_SPEED)?.getLong()),
-				uploadSession: toNumber(findNumericTag(tags, ECTagName.EC_TAG_CLIENT_UPLOAD_SESSION)?.getLong()),
-				transferredDown: toNumber(findNumericTag(tags, ECTagName.EC_TAG_PARTFILE_SIZE_XFER)?.getLong()),
-				uploadedTotal: toNumber(findNumericTag(tags, ECTagName.EC_TAG_CLIENT_UPLOAD_TOTAL)?.getLong()),
-				downloadedTotal: toNumber(findNumericTag(tags, ECTagName.EC_TAG_CLIENT_DOWNLOAD_TOTAL)?.getLong()),
+				upSpeed: toOptionalNumber(findNumericTag(tags, ECTagName.EC_TAG_CLIENT_UP_SPEED)?.getLong()),
+				downSpeed: toOptionalNumber(findNumericTag(tags, ECTagName.EC_TAG_CLIENT_DOWN_SPEED)?.getLong()),
+				uploadSession: toOptionalNumber(findNumericTag(tags, ECTagName.EC_TAG_CLIENT_UPLOAD_SESSION)?.getLong()),
+				transferredDown: toOptionalNumber(findNumericTag(tags, ECTagName.EC_TAG_PARTFILE_SIZE_XFER)?.getLong()),
+				uploadedTotal: toOptionalNumber(findNumericTag(tags, ECTagName.EC_TAG_CLIENT_UPLOAD_TOTAL)?.getLong()),
+				downloadedTotal: toOptionalNumber(findNumericTag(tags, ECTagName.EC_TAG_CLIENT_DOWNLOAD_TOTAL)?.getLong()),
 
 				uploadState: findNumericTag(tags, ECTagName.EC_TAG_CLIENT_UPLOAD_STATE)?.getInt(),
 				downloadState: findNumericTag(tags, ECTagName.EC_TAG_CLIENT_DOWNLOAD_STATE)?.getInt(),
@@ -63,11 +57,11 @@ export class ClientQueueResponseParser {
 				obfuscationStatus: findNumericTag(tags, ECTagName.EC_TAG_CLIENT_OBFUSCATION_STATUS)?.getInt(),
 				kadPort: findNumericTag(tags, ECTagName.EC_TAG_CLIENT_KAD_PORT)?.getInt(),
 				friendSlot: findNumericTag(tags, ECTagName.EC_TAG_CLIENT_FRIEND_SLOT)?.getInt(),
-				uploadFileId: toNumber(findNumericTag(tags, ECTagName.EC_TAG_CLIENT_UPLOAD_FILE)?.getLong()),
+				uploadFileId: toOptionalNumber(findNumericTag(tags, ECTagName.EC_TAG_CLIENT_UPLOAD_FILE)?.getLong()),
 				uploadFilename: findTag(tags, ECTagName.EC_TAG_PARTFILE_NAME)?.getValue(),
-				requestFileId: toNumber(findNumericTag(tags, ECTagName.EC_TAG_CLIENT_REQUEST_FILE)?.getLong()),
+				requestFileId: toOptionalNumber(findNumericTag(tags, ECTagName.EC_TAG_CLIENT_REQUEST_FILE)?.getLong()),
 				remoteFilename: findTag(tags, ECTagName.EC_TAG_CLIENT_REMOTE_FILENAME)?.getValue(),
-				disableViewShared: !!findNumericTag(tags, ECTagName.EC_TAG_CLIENT_DISABLE_VIEW_SHARED)?.getInt(),
+				disableViewShared: toOptionalBool(findNumericTag(tags, ECTagName.EC_TAG_CLIENT_DISABLE_VIEW_SHARED)?.getInt()),
 				version: findNumericTag(tags, ECTagName.EC_TAG_CLIENT_VERSION)?.getInt(),
 				modVersion: findTag(tags, ECTagName.EC_TAG_CLIENT_MOD_VERSION)?.getValue(),
 				osInfo: findTag(tags, ECTagName.EC_TAG_CLIENT_OS_INFO)?.getValue(),
