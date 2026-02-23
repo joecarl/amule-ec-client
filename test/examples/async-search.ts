@@ -14,6 +14,20 @@ async function main() {
 	});
 
 	try {
+		console.log('Connecting to ed2k server...');
+
+		await client.connectToServer();
+
+		while (true) {
+			await new Promise((r) => setTimeout(r, 1000));
+			const stats = await client.getStats();
+			if (stats.connectedServer) {
+				const srv = stats.connectedServer;
+				console.log(`Currently connected to: ${srv.name} (${srv.ip}:${srv.port})`);
+				break;
+			}
+		}
+
 		console.log('Starting async search...');
 
 		// Start the search

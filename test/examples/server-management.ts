@@ -24,14 +24,25 @@ async function main() {
 		}
 
 		for (const server of servers) {
-			console.log(`- Server: ${server.name} | IP: ${server.ip} | Port: ${server.port} | Address: ${server.address}`);
+			console.log(`- Server: ${server.name} | IP: ${server.ip} | Port: ${server.port}`);
 		}
 
-		if (servers.length > 1) {
-			const server = servers[1];
+		if (servers.length > 0) {
+			const server = servers[servers.length - 1];
 			console.log(`Connecting to server: ${server.name} (${server.ip}:${server.port})`);
-			await client.connectToServer(server.ip, server.port);
+			await client.connectToServer(server.ip!, server.port!);
 			console.log('Connect request sent.');
+
+			while (true) {
+				await new Promise((r) => setTimeout(r, 2000));
+				const stats = await client.getStats();
+				//console.log('Current stats:', stats);
+				if (stats.connectedServer) {
+					const srv = stats.connectedServer;
+					console.log(`Currently connected to: ${srv.name} (${srv.ip}:${srv.port})`);
+					break;
+				}
+			}
 		}
 
 		console.log('Disconnecting from current server...');

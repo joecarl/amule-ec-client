@@ -228,39 +228,15 @@ export class TagEncoder {
 				}
 				return offset; // Empty custom tag, no data to write
 
-			case ECTagType.EC_TAGTYPE_STRING:
-				// String value is just the UTF-8 string + null terminator
-				// No additional length prefix - tagLength header already specifies the size
-				encoded.copy(buffer, offset);
-				return offset + encoded.length;
-
 			case ECTagType.EC_TAGTYPE_UINT8:
-				buffer.writeUInt8(tag.getValue(), offset);
-				return offset + 1;
-
 			case ECTagType.EC_TAGTYPE_UINT16:
-				buffer.writeUInt16BE(tag.getValue(), offset);
-				return offset + 2;
-
 			case ECTagType.EC_TAGTYPE_UINT32:
-				buffer.writeUInt32BE(tag.getValue(), offset);
-				return offset + 4;
-
 			case ECTagType.EC_TAGTYPE_UINT64:
-				buffer.writeBigUInt64BE(tag.getValue(), offset);
-				return offset + 8;
-
+			case ECTagType.EC_TAGTYPE_STRING:
 			case ECTagType.EC_TAGTYPE_DOUBLE:
-				buffer.writeDoubleBE(tag.getValue(), offset);
-				return offset + 8;
-
 			case ECTagType.EC_TAGTYPE_IPV4:
-				buffer.writeUInt32BE(tag.getValue().ip, offset);
-				buffer.writeUInt16BE(tag.getValue().port, offset + 4);
-				return offset + 6;
-
-			case ECTagType.EC_TAGTYPE_UINT128:
 			case ECTagType.EC_TAGTYPE_HASH16:
+			case ECTagType.EC_TAGTYPE_UINT128:
 				encoded.copy(buffer, offset);
 				return offset + encoded.length;
 

@@ -76,7 +76,9 @@ export class UByteTag extends Tag<number> implements NumericTag {
 	}
 
 	encodeValue(): Buffer {
-		return Buffer.from([this.getValue()]);
+		const buf = Buffer.allocUnsafe(1);
+		buf.writeUInt8(this.getValue());
+		return buf;
 	}
 
 	getShort(): number {
@@ -297,14 +299,14 @@ export class DoubleTag extends Tag<number> {
 	}
 
 	parseValue(value: Buffer): void {
-		if (value[value.length - 1] !== 0x00) {
-			throw new Error('DoubleTag value must be null terminated');
-		}
-		this.setValue(parseFloat(value.toString('utf8', 0, value.length - 1)));
+		const numValue = value.length >= 8 ? value.readDoubleBE(0) : 0;
+		this.setValue(numValue);
 	}
 
 	encodeValue(): Buffer {
-		return Buffer.concat([Buffer.from(this.getValue().toString(), 'utf8'), Buffer.from([0x00])]);
+		const buf = Buffer.allocUnsafe(8);
+		buf.writeDoubleBE(this.getValue());
+		return buf;
 	}
 }
 
@@ -314,14 +316,15 @@ export interface Ipv4Value {
 }
 
 export class Ipv4Tag extends Tag<Ipv4Value> {
-	constructor(name: ECTagName, subtags: Tag<any>[] = [], nameValue: number = name) {
+	constructor(name: ECTagName, value?: Ipv4Value, subtags: Tag<any>[] = [], nameValue: number = name) {
 		super(name, ECTagType.EC_TAGTYPE_IPV4, subtags, nameValue);
+		if (value !== undefined) {
+			this.setValue(value);
+		}
 	}
 
 	static withValue(name: ECTagName, value: Ipv4Value, subtags: Tag<any>[] = []): Ipv4Tag {
-		const tag = new Ipv4Tag(name, subtags);
-		tag.setValue(value);
-		return tag;
+		return new Ipv4Tag(name, value, subtags);
 	}
 
 	parseValue(value: Buffer): void {
@@ -335,7 +338,7 @@ export class Ipv4Tag extends Tag<Ipv4Value> {
 
 	encodeValue(): Buffer {
 		const val = this.getValue();
-		const parts = val.address.split('.').map((p) => parseInt(p));
+		const parts = val.address.split('.').map(Number);
 		const buf = Buffer.allocUnsafe(6);
 		buf[0] = parts[0];
 		buf[1] = parts[1];

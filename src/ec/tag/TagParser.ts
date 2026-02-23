@@ -200,9 +200,8 @@ export class TagParser {
 			}
 
 			case ECTagType.EC_TAGTYPE_DOUBLE: {
-				// Double is stored as a null-terminated string representation
-				const strValue = value[value.length - 1] === 0x00 ? value.toString('utf-8', 0, value.length - 1) : value.toString('utf-8');
-				return new DoubleTag(name, parseFloat(strValue));
+				const numValue = value.length >= 8 ? value.readDoubleBE(0) : 0;
+				return new DoubleTag(name, numValue);
 			}
 
 			case ECTagType.EC_TAGTYPE_IPV4: {

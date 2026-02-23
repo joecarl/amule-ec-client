@@ -251,7 +251,7 @@ export class AmuleClient {
 	/**
 	 * Connect to a specific server
 	 */
-	async connectToServer(ip: string, port: number): Promise<void> {
+	async connectToServer(ip?: string, port?: number): Promise<void> {
 		const { ServerConnectRequest } = await import('../request/ServerConnectRequest');
 
 		const request = new ServerConnectRequest(ip, port);
