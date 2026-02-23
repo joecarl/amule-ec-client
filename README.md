@@ -15,8 +15,8 @@ Ported from [jamule](https://github.com/vexdev/jamule) (Java/Kotlin) to TypeScri
 - ✅ File searching (local, global, Kad, web)
 - ✅ Download management
 - ✅ Shared files listing
-- ⏳ Category management (partial)
-- ⏳ ED2K link parsing
+- ✅ Category management
+- ✅ ED2K link parsing
 
 ## Installation
 
@@ -114,9 +114,7 @@ This library implements the aMule External Connection protocol version 0x0204, c
 
 ### Protocol Features
 
-- UTF-8 number encoding for reduced packet size
 - ZLIB compression support
-- MD5-based authentication with salt
 - Binary packet format with tagged data structures
 
 ## Development
