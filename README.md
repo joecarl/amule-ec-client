@@ -111,6 +111,7 @@ This library implements the aMule External Connection protocol version 0x0204, c
 - aMule 2.3.1
 - aMule 2.3.2
 - aMule 2.3.3
+- aMule 3.0.0
 
 ### Protocol Features
 

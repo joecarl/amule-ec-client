@@ -1,0 +1,63 @@
+#!/bin/bash
+# Installs aMule from the official GitHub release AppImage.
+# Works in both Docker (no FUSE) and devcontainer environments.
+# Usage: install-amule-gh-release.sh [version]  (default: 3.0.0)
+set -e
+
+AMULE_VERSION="${1:-3.0.0}"
+
+# Select the release asset for the build platform. Under a buildx
+# cross-build (docker/setup-qemu-action), uname -m reports the *target*
+# architecture, so this also works when cross-building linux/arm64 from
+# an amd64 runner.
+case "$(uname -m)" in
+    x86_64)  AMULE_ARCH="x64" ;;
+    aarch64) AMULE_ARCH="arm64" ;;
+    *)
+        echo "Unsupported architecture: $(uname -m)" >&2
+        exit 1
+        ;;
+esac
+
+APPIMAGE_URL="https://github.com/amule-project/amule/releases/download/${AMULE_VERSION}/aMule-${AMULE_VERSION}-Linux-${AMULE_ARCH}.AppImage"
+APPIMAGE_PATH="/tmp/aMule-${AMULE_VERSION}-Linux-${AMULE_ARCH}.AppImage"
+INSTALL_DIR="/opt/amule"
+
+echo "Installing aMule ${AMULE_VERSION} (${AMULE_ARCH})..."
+
+# Install some libraries needed by amuled and amulecmd and this script. 
+# wget is needed to download the AppImage, and will be removed at the end.
+# libreadline8 needed by amulecmd.
+# ca-certificates needed by amuled for HTTPS download like serverlist updates.
+apt-get install -y --no-install-recommends libreadline8 ca-certificates wget
+
+# Download AppImage
+wget -q --show-progress -O "${APPIMAGE_PATH}" "${APPIMAGE_URL}"
+chmod +x "${APPIMAGE_PATH}"
+
+# AppImages set magic bytes "AI\x02" at ELF header offset 8. Native kernels
+# ignore them, but they break binfmt_misc matching under QEMU (buildx
+# cross-builds fail with "cannot execute binary file: Exec format error").
+# Zero them before executing — the runtime doesn't need them, and this is a
+# no-op for correctness on native builds too.
+dd if=/dev/zero of="${APPIMAGE_PATH}" bs=1 seek=8 count=3 conv=notrunc status=none
+
+# Extract without FUSE
+cd /tmp && "${APPIMAGE_PATH}" --appimage-extract > /dev/null
+rm -rf "${INSTALL_DIR}"
+mv /tmp/squashfs-root "${INSTALL_DIR}"
+rm "${APPIMAGE_PATH}"
+
+# Symlink binaries. Fail hard if a binary is missing — a silent skip would
+# produce an image without amuled (e.g. if an arch variant of the AppImage
+# ever ships a different internal layout).
+for bin in amuled amulecmd; do
+    if [ -f "${INSTALL_DIR}/usr/bin/${bin}" ]; then
+        ln -sf "${INSTALL_DIR}/usr/bin/${bin}" "/usr/local/bin/${bin}"
+    else
+        echo "ERROR: ${bin} not found at ${INSTALL_DIR}/usr/bin/${bin}" >&2
+        exit 1
+    fi
+done
+
+echo "aMule ${AMULE_VERSION} installed."

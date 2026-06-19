@@ -3,8 +3,9 @@ set -e
 
 # Install aMule daemon
 echo "Installing aMule daemon..."
-sudo apt-get update
-sudo apt-get install -y amule-daemon amule-utils
+# sudo apt-get update
+# sudo apt-get install -y amule-daemon amule-utils
+sudo bash install-amule-gh-release.sh 3.0.0
 
 # Create configuration directory if not exists
 mkdir -p ~/.aMule

@@ -5,7 +5,11 @@
 		"moduleResolution": "bundler",
 		"declaration": true,
 		"strict": true,
-		"outDir": "./dist"
+		"outDir": "./dist",
+		"rootDir": "./src",
+		"types": [
+			"node"
+		]
 	},
 	"include": [
 		"src/**/*"

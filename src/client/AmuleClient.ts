@@ -3,7 +3,8 @@
  */
 
 import { AmuleConnection } from './AmuleConnection';
-import type { AmuleFile, AmuleTransferringFile, AmuleCategory, AmuleServer, DownloadCommand, SearchType, AmuleUpDownClient, AmuleFriend } from '../model';
+import type { AmuleFile, AmuleTransferringFile, AmuleCategory, AmuleServer, SearchType, AmuleUpDownClient, AmuleFriend } from '../model';
+import { DownloadCommand } from '../model';
 import type { SearchFilters } from '../types';
 import { EcPrefs, ECDetailLevel } from '../ec/Codes';
 
@@ -344,7 +345,6 @@ export class AmuleClient {
 	 * Pause a download
 	 */
 	async pauseDownload(hash: Buffer): Promise<void> {
-		const { DownloadCommand } = await import('../model');
 		await this.sendDownloadCommand(hash, DownloadCommand.PAUSE);
 	}
 
@@ -352,7 +352,6 @@ export class AmuleClient {
 	 * Resume a download
 	 */
 	async resumeDownload(hash: Buffer): Promise<void> {
-		const { DownloadCommand } = await import('../model');
 		await this.sendDownloadCommand(hash, DownloadCommand.RESUME);
 	}
 
@@ -360,7 +359,6 @@ export class AmuleClient {
 	 * Stop a download
 	 */
 	async stopDownload(hash: Buffer): Promise<void> {
-		const { DownloadCommand } = await import('../model');
 		await this.sendDownloadCommand(hash, DownloadCommand.STOP);
 	}
 
@@ -368,7 +366,6 @@ export class AmuleClient {
 	 * Delete a download
 	 */
 	async deleteDownload(hash: Buffer): Promise<void> {
-		const { DownloadCommand } = await import('../model');
 		await this.sendDownloadCommand(hash, DownloadCommand.DELETE);
 	}
 }
