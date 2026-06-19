@@ -223,6 +223,16 @@ export class AmuleClient {
 	}
 
 	/**
+	 * Reload shared files list
+	 */
+	async reloadSharedFiles(): Promise<void> {
+		const { ReloadSharedFilesRequest } = await import('../request/ReloadSharedFilesRequest');
+
+		const request = new ReloadSharedFilesRequest();
+		await this.connection.sendRequest(request);
+	}
+
+	/**
 	 * Get client upload/download queue (clients we are uploading to/downloading from)
 	 */
 	async getClientQueue(): Promise<AmuleUpDownClient[]> {
