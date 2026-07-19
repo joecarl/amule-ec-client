@@ -130,6 +130,11 @@ export class AmuleConnection {
 				// Perform authentication
 				await this.authenticate();
 
+				// The socket timeout is an *idle* timeout in Node; keeping it active would
+				// kill healthy but quiet connections. It only guards connection establishment
+				// and auth; per-request timeouts take over from here.
+				this.socket?.setTimeout(0);
+
 				this.connected = true;
 			} finally {
 				this.connectionPromise = undefined;
@@ -144,15 +149,18 @@ export class AmuleConnection {
 	 */
 	private connectSocket(): Promise<void> {
 		return new Promise((resolve, reject) => {
-			if (!this.socket) {
+			const socket = this.socket;
+			if (!socket) {
 				return reject(new CommunicationException('Socket not initialized'));
 			}
 
-			this.socket.connect(this.port, this.host, () => {
+			const onError = (error: Error) => reject(error);
+			socket.once('error', onError);
+
+			socket.connect(this.port, this.host, () => {
+				socket.removeListener('error', onError);
 				resolve();
 			});
-
-			this.socket.once('error', reject);
 		});
 	}
 

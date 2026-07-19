@@ -3,9 +3,19 @@
  */
 
 import { Packet } from '../ec/packet/Packet';
-import { ECTagName } from '../ec/Codes';
+import { ECTagName, type ECSearchFileDownloadStatus } from '../ec/Codes';
 import { findNumericTag, findTag } from '../ec/tag/Tag';
-import type { SearchResultsResponse } from '../client/AmuleClient';
+
+export interface SearchResultsResponse {
+	files: {
+		fileName: string;
+		hash: Buffer;
+		sizeFull: number;
+		downloadStatus: ECSearchFileDownloadStatus;
+		completeSourceCount: number;
+		sourceCount: number;
+	}[];
+}
 
 export class SearchResultsResponseParser {
 	static fromPacket(packet: Packet): SearchResultsResponse {

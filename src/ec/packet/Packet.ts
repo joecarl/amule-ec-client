@@ -2,13 +2,11 @@
  * EC Packet structure
  */
 
-import { ECOpCode } from '../Codes';
+import { ECOpCode, type ECTagName } from '../Codes';
 import { Flags } from './Flags';
-import type { Tag } from '../tag/Tag';
+import { findTag, type Tag } from '../tag/Tag';
 
 export class Packet {
-	private static readonly EC_CURRENT_PROTOCOL_VERSION = 0x0204;
-
 	constructor(
 		public readonly opCode: ECOpCode,
 		public readonly flags: Flags = new Flags(),
@@ -32,17 +30,10 @@ export class Packet {
 	}
 
 	/**
-	 * Get protocol version
-	 */
-	static getProtocolVersion(): number {
-		return Packet.EC_CURRENT_PROTOCOL_VERSION;
-	}
-
-	/**
 	 * Find a tag by name
 	 */
-	findTag(tagName: number): Tag<any> | undefined {
-		return this.tags.find((tag) => tag.name === tagName);
+	findTag(tagName: ECTagName): Tag<any> | undefined {
+		return findTag(this.tags, tagName);
 	}
 
 	/**

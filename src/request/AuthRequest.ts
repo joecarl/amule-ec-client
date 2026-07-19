@@ -3,7 +3,7 @@
  */
 
 import { Request } from './Request';
-import { ECOpCode, ECTagName } from '../ec/Codes';
+import { ECOpCode, ECTagName, ProtocolVersion } from '../ec/Codes';
 import { Hash16Tag, UShortTag, StringTag, CustomTag } from '../ec/tag/Tag';
 
 export class AuthClientInfoRequest extends Request {
@@ -15,7 +15,7 @@ export class AuthClientInfoRequest extends Request {
 		this.addTag(new StringTag(ECTagName.EC_TAG_CLIENT_VERSION, clientVersion));
 
 		// Add protocol version
-		this.addTag(new UShortTag(ECTagName.EC_TAG_PROTOCOL_VERSION, 0x0204));
+		this.addTag(new UShortTag(ECTagName.EC_TAG_PROTOCOL_VERSION, ProtocolVersion.EC_CURRENT_PROTOCOL_VERSION));
 
 		// Add capability flags as empty CustomTag (like jamule does)
 		this.addTag(new CustomTag(ECTagName.EC_TAG_CAN_ZLIB, Buffer.alloc(0)));

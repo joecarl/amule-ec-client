@@ -15,7 +15,7 @@
 import { ECTagName } from '../ec/Codes';
 import { Packet } from '../ec/packet/Packet';
 import type { AmuleFile, AmuleTransferringFile, AmuleUpDownClient } from '../model';
-import { computeChunkInfo, DownloadSourceNamesResponseParser, extractPartFileStatusBuffers, rleDecode, xorReconstruct } from '../response/DownloadDetailsResponse';
+import { computeChunkInfo, extractPartFileStatusBuffers, rleDecode, sourceNameEntriesFromFileTag, xorReconstruct } from '../response/DownloadDetailsResponse';
 import { UpdateResponseParser, type UpdateResponse } from '../response/UpdateResponse';
 import { tagOwnNumericValue, toOptionalNumber } from '../response/utils';
 import type { PartFileStatusBuffers, SourceNameCount } from '../types/download-details';
@@ -153,7 +153,7 @@ export class UpdateState {
 				file.chunkInfo = computeChunkInfo(file.sizeFull, state);
 			}
 
-			const entries = DownloadSourceNamesResponseParser.entriesFromFileTag(fileTag);
+			const entries = sourceNameEntriesFromFileTag(fileTag);
 			if (entries) {
 				const nameMap = this.sourceNames.get(ecid) || new Map<number, SourceNameCount>();
 				for (const entry of entries) {

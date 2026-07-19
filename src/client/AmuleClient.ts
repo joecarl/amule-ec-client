@@ -4,11 +4,17 @@
 
 import { AmuleConnection } from './AmuleConnection';
 import type { UpdateState } from './UpdateState';
-import type { AmuleFile, AmuleTransferringFile, AmuleCategory, AmuleServer, SearchType, AmuleUpDownClient, AmuleFriend } from '../model';
+import type { AmuleFile, AmuleTransferringFile, AmuleCategory, AmuleServer, SearchType, AmuleUpDownClient } from '../model';
 import { DownloadCommand } from '../model';
 import type { SearchFilters } from '../types';
 import { EcPrefs, ECDetailLevel } from '../ec/Codes';
 import type { AmulePreferences } from '../types/preferences';
+import type { StatsResponse } from '../response/StatsResponse';
+import type { SearchResultsResponse } from '../response/SearchResultsResponse';
+import type { UpdateResponse } from '../response/UpdateResponse';
+
+// Response shapes live next to their parsers; re-exported here for backwards compatibility
+export type { StatsResponse, SearchResultsResponse, UpdateResponse };
 
 export interface AmuleClientOptions {
 	host: string;
@@ -16,56 +22,6 @@ export interface AmuleClientOptions {
 	password: string;
 	timeout?: number;
 	requestTimeout?: number;
-}
-
-export interface StatsResponse {
-	id: number;
-	ed2kId: number;
-	kadId?: string;
-	connectedServer?: {
-		name?: string;
-		description?: string;
-		ip: string;
-		port: number;
-	};
-	connectionState?: any; // Will be properly typed later
-	uploadOverhead: number;
-	downloadOverhead: number;
-	bannedCount: number;
-	loggerMessage: string[];
-	totalSentBytes: number;
-	totalReceivedBytes: number;
-	sharedFileCount: number;
-	uploadSpeed: number;
-	downloadSpeed: number;
-	uploadSpeedLimit: number;
-	downloadSpeedLimit: number;
-	uploadQueueLength: number;
-	totalSourceCount: number;
-	ed2kUsers: number;
-	kadUsers: number;
-	ed2kFiles: number;
-	kadFiles: number;
-	kadNodes: number;
-}
-
-export interface SearchResultsResponse {
-	files: {
-		fileName: string;
-		hash: Buffer;
-		sizeFull: number;
-		downloadStatus: number;
-		completeSourceCount: number;
-		sourceCount: number;
-	}[];
-}
-
-export interface UpdateResponse {
-	sharedFiles: AmuleFile[];
-	downloadQueue: AmuleTransferringFile[];
-	clients: AmuleUpDownClient[];
-	servers: AmuleServer[];
-	friends: AmuleFriend[];
 }
 
 export class AmuleClient {
@@ -280,7 +236,8 @@ export class AmuleClient {
 	}
 
 	/**
-	 * Get client upload/download queue (clients we are uploading to/downloading from)
+	 * Get the upload queue: clients we are uploading to or that wait in our queue
+	 * (EC_OP_GET_ULOAD_QUEUE). For download sources use getDownloadQueueWithSources().
 	 */
 	async getClientQueue(): Promise<AmuleUpDownClient[]> {
 		const { ClientQueueRequest } = await import('../request/ClientQueueRequest');

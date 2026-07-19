@@ -1,5 +1,4 @@
 import { ECTagName } from '../ec/Codes';
-import { Packet } from '../ec/packet/Packet';
 import { findNumericTag, findTag, type Tag } from '../ec/tag/Tag';
 import { ChunkStatus, PARTSIZE, type ChunkInfo, type PartFileStatusBuffers, type SourceNameCount, type SourceNameEntry } from '../types/download-details';
 import { tagOwnNumericValue } from './utils';
@@ -9,24 +8,36 @@ import { tagOwnNumericValue } from './utils';
  * Format: [value, value, count] repeats value count times; other bytes pass through.
  */
 export function rleDecode(buf: Buffer): Buffer {
-	const output: number[] = [];
+	// First pass: compute the decoded size
+	let size = 0;
 	let index = 0;
-
 	while (index < buf.length) {
 		if (index < buf.length - 2 && buf[index + 1] === buf[index]) {
-			const value = buf[index];
-			const count = buf[index + 2];
-			for (let i = 0; i < count; i++) {
-				output.push(value);
-			}
+			size += buf[index + 2];
 			index += 3;
 		} else {
-			output.push(buf[index]);
+			size += 1;
 			index += 1;
 		}
 	}
 
-	return Buffer.from(output);
+	// Second pass: decode
+	const output = Buffer.alloc(size);
+	let outIndex = 0;
+	index = 0;
+	while (index < buf.length) {
+		if (index < buf.length - 2 && buf[index + 1] === buf[index]) {
+			const count = buf[index + 2];
+			output.fill(buf[index], outIndex, outIndex + count);
+			outIndex += count;
+			index += 3;
+		} else {
+			output[outIndex++] = buf[index];
+			index += 1;
+		}
+	}
+
+	return output;
 }
 
 /**
@@ -91,14 +102,7 @@ function nestedNumeric(parent: Tag<any>, tagName: ECTagName): number {
 	if (numeric) {
 		return Number(numeric.getValue());
 	}
-	const tag = findTag(parent.nestedTags, tagName);
-	if (!tag) return 0;
-
-	const value = tag.getValue();
-	if (typeof value === 'number') return value;
-	if (typeof value === 'bigint') return Number(value);
-
-	return 0;
+	return tagOwnNumericValue(findTag(parent.nestedTags, tagName)) ?? 0;
 }
 
 /**
@@ -175,95 +179,61 @@ export function computeChunkInfo(sizeFull: number, buffers: PartFileStatusBuffer
 }
 
 /**
- * Chunk details from a full (non-incremental) download queue packet, keyed by file hash.
+ * Chunk details of a partfile tag from a full (non-incremental) download queue packet.
  * Only valid for EC_OP_GET_DLOAD_QUEUE responses: incremental updates (EC_OP_GET_UPDATE)
  * send XOR diffs for the status buffers and must be reconstructed statefully instead.
  */
-export class DownloadChunkDetailsResponseParser {
-	static fromPacket(packet: Packet): Record<string, ChunkInfo> {
-		const result: Record<string, ChunkInfo> = {};
-		const partfileTags = packet.tags.filter((tag) => tag.name === ECTagName.EC_TAG_PARTFILE);
-
-		for (const fileTag of partfileTags) {
-			const hash = bufferValue(nestedTag(fileTag, ECTagName.EC_TAG_PARTFILE_HASH));
-			if (!hash) {
-				continue;
-			}
-
-			const sizeFull = nestedNumeric(fileTag, ECTagName.EC_TAG_PARTFILE_SIZE_FULL);
-			const raw = extractPartFileStatusBuffers(fileTag);
-			const decoded: PartFileStatusBuffers = {
-				partStatus: raw.partStatus ? rleDecode(raw.partStatus) : undefined,
-				gapStatus: raw.gapStatus ? rleDecode(raw.gapStatus) : undefined,
-				reqStatus: raw.reqStatus ? rleDecode(raw.reqStatus) : undefined,
-			};
-
-			result[hash.toString('hex')] = computeChunkInfo(sizeFull, decoded);
-		}
-
-		return result;
-	}
+export function chunkInfoFromPartFileTag(fileTag: Tag<any>): ChunkInfo {
+	const sizeFull = nestedNumeric(fileTag, ECTagName.EC_TAG_PARTFILE_SIZE_FULL);
+	const raw = extractPartFileStatusBuffers(fileTag);
+	const decoded: PartFileStatusBuffers = {
+		partStatus: raw.partStatus ? rleDecode(raw.partStatus) : undefined,
+		gapStatus: raw.gapStatus ? rleDecode(raw.gapStatus) : undefined,
+		reqStatus: raw.reqStatus ? rleDecode(raw.reqStatus) : undefined,
+	};
+	return computeChunkInfo(sizeFull, decoded);
 }
 
 /**
- * Source names of a partfile: the filenames under which the sources share the file.
+ * Raw diff entries of the source-names map of a partfile tag, or undefined when the
+ * packet carries no source-names changes for this file.
  *
- * The daemon sends them as a per-connection incremental map (see CPartFile_Encoder::Encode
- * in aMule's ExternalConn.cpp): an EC_TAG_PARTFILE_SOURCE_NAMES container whose children
- * are integer-valued EC_TAG_PARTFILE_SOURCE_NAMES tags (the map key), each carrying a
- * nested count (0 removes the entry) and, only when the entry is new, a nested name string.
- * The map is never reset while the connection lives, not even for EC_DETAIL_FULL requests.
+ * The daemon sends source names (the filenames under which the sources share the file)
+ * as a per-connection incremental map (see CPartFile_Encoder::Encode in aMule's
+ * ExternalConn.cpp): an EC_TAG_PARTFILE_SOURCE_NAMES container whose children are
+ * integer-valued EC_TAG_PARTFILE_SOURCE_NAMES tags (the map key), each carrying a
+ * nested count (0 removes the entry) and, only when the entry is new, a nested name
+ * string. The map is never reset while the connection lives, not even for
+ * EC_DETAIL_FULL requests.
  */
-export class DownloadSourceNamesResponseParser {
-	/**
-	 * Raw diff entries of the source-names map of a partfile tag, or undefined when the
-	 * packet carries no source-names changes for this file.
-	 */
-	static entriesFromFileTag(fileTag: Tag<any>): SourceNameEntry[] | undefined {
-		const container = nestedTag(fileTag, ECTagName.EC_TAG_PARTFILE_SOURCE_NAMES);
-		if (!container) {
-			return undefined;
-		}
-
-		const entries: SourceNameEntry[] = [];
-		for (const child of container.nestedTags || []) {
-			if (child.name !== ECTagName.EC_TAG_PARTFILE_SOURCE_NAMES) {
-				continue;
-			}
-			const id = tagOwnNumericValue(child);
-			if (id === undefined) {
-				continue;
-			}
-			const name = stringValue(nestedTag(child, ECTagName.EC_TAG_PARTFILE_SOURCE_NAMES)) || undefined;
-			const count = nestedNumeric(child, ECTagName.EC_TAG_PARTFILE_SOURCE_NAMES_COUNTS);
-			entries.push({ id, name, count });
-		}
-		return entries;
+export function sourceNameEntriesFromFileTag(fileTag: Tag<any>): SourceNameEntry[] | undefined {
+	const container = nestedTag(fileTag, ECTagName.EC_TAG_PARTFILE_SOURCE_NAMES);
+	if (!container) {
+		return undefined;
 	}
 
-	/**
-	 * Stateless view keyed by file hash: only entries whose name is present in this very
-	 * packet (i.e. new for the connection). Complete on the first request of a connection;
-	 * later requests only carry changes, so prefer the stateful update path for polling.
-	 */
-	static fromPacket(packet: Packet): Record<string, SourceNameCount[]> {
-		const result: Record<string, SourceNameCount[]> = {};
-		const partfileTags = packet.tags.filter((tag) => tag.name === ECTagName.EC_TAG_PARTFILE);
-
-		for (const fileTag of partfileTags) {
-			const hash = bufferValue(nestedTag(fileTag, ECTagName.EC_TAG_PARTFILE_HASH));
-			if (!hash) {
-				continue;
-			}
-
-			const entries = this.entriesFromFileTag(fileTag);
-			if (!entries) {
-				continue;
-			}
-
-			result[hash.toString('hex')] = entries.filter((entry) => entry.name !== undefined && entry.count > 0).map((entry) => ({ name: entry.name!, count: entry.count }));
+	const entries: SourceNameEntry[] = [];
+	for (const child of container.nestedTags || []) {
+		if (child.name !== ECTagName.EC_TAG_PARTFILE_SOURCE_NAMES) {
+			continue;
 		}
-
-		return result;
+		const id = tagOwnNumericValue(child);
+		if (id === undefined) {
+			continue;
+		}
+		const name = stringValue(nestedTag(child, ECTagName.EC_TAG_PARTFILE_SOURCE_NAMES)) || undefined;
+		const count = nestedNumeric(child, ECTagName.EC_TAG_PARTFILE_SOURCE_NAMES_COUNTS);
+		entries.push({ id, name, count });
 	}
+	return entries;
+}
+
+/**
+ * Stateless view of source-name diff entries: only entries whose name is present in
+ * this very packet (i.e. new for the connection). Complete on the first request of a
+ * connection; later requests only carry changes, so prefer the stateful update path
+ * for polling.
+ */
+export function sourceNameCountsFromEntries(entries: SourceNameEntry[]): SourceNameCount[] {
+	return entries.filter((entry) => entry.name !== undefined && entry.count > 0).map((entry) => ({ name: entry.name!, count: entry.count }));
 }

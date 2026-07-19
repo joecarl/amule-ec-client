@@ -14,7 +14,7 @@ export type { AmuleClientOptions, StatsResponse, SearchResultsResponse, UpdateRe
 export * from './model';
 
 // Enums and constants
-export { ECOpCode, ECTagName, ECDetailLevel, ECSearchType, EcPrefs, ProtocolVersion } from './ec/Codes';
+export { ECOpCode, ECTagName, ECDetailLevel, ECSearchType, ECSearchFileDownloadStatus, EcPrefs, ProtocolVersion } from './ec/Codes';
 
 // Exceptions
 export { AmuleException, InvalidECException, CommunicationException, ServerException } from './exceptions';

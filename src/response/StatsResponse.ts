@@ -5,7 +5,46 @@
 import { Packet } from '../ec/packet/Packet';
 import { ECTagName } from '../ec/Codes';
 import { findNumericTag, findTag } from '../ec/tag/Tag';
-import type { StatsResponse } from '../client/AmuleClient';
+import type { ConnectionState } from '../types';
+import { tagOwnNumericValue } from './utils';
+
+export interface StatsResponse {
+	id: number;
+	ed2kId: number;
+	kadId?: string;
+	connectedServer?: {
+		name?: string;
+		description?: string;
+		ip: string;
+		port: number;
+	};
+	connectionState?: ConnectionState;
+	uploadOverhead: number;
+	downloadOverhead: number;
+	bannedCount: number;
+	loggerMessage: string[];
+	totalSentBytes: number;
+	totalReceivedBytes: number;
+	sharedFileCount: number;
+	uploadSpeed: number;
+	downloadSpeed: number;
+	uploadSpeedLimit: number;
+	downloadSpeedLimit: number;
+	uploadQueueLength: number;
+	totalSourceCount: number;
+	ed2kUsers: number;
+	kadUsers: number;
+	ed2kFiles: number;
+	kadFiles: number;
+	kadNodes: number;
+}
+
+// EC_TAG_CONNSTATE value bits, see CEC_ConnState_Tag in aMule's ECSpecialTags.h
+const CONNSTATE_ED2K_CONNECTED = 0x01;
+const CONNSTATE_ED2K_CONNECTING = 0x02;
+const CONNSTATE_KAD_CONNECTED = 0x04;
+const CONNSTATE_KAD_FIREWALLED = 0x08;
+const CONNSTATE_KAD_RUNNING = 0x10;
 
 export class StatsResponseParser {
 	static fromPacket(packet: Packet): StatsResponse {
@@ -38,6 +77,7 @@ export class StatsResponseParser {
 		let clientId = 0;
 		let kadId: string | undefined;
 		let connectedServer: StatsResponse['connectedServer'];
+		let connectionState: ConnectionState | undefined;
 
 		if (connStateTag && connStateTag.nestedTags) {
 			ed2kId = Number(findNumericTag(connStateTag.nestedTags, ECTagName.EC_TAG_ED2K_ID)?.getValue() || 0);
@@ -65,6 +105,20 @@ export class StatsResponseParser {
 					};
 				}
 			}
+
+			const stateBits = tagOwnNumericValue(connStateTag) ?? 0;
+			connectionState = {
+				ed2kConnected: (stateBits & CONNSTATE_ED2K_CONNECTED) !== 0,
+				ed2kConnecting: (stateBits & CONNSTATE_ED2K_CONNECTING) !== 0,
+				kadConnected: (stateBits & CONNSTATE_KAD_CONNECTED) !== 0,
+				kadFirewalled: (stateBits & CONNSTATE_KAD_FIREWALLED) !== 0,
+				kadRunning: (stateBits & CONNSTATE_KAD_RUNNING) !== 0,
+				ed2kId: ed2kId || undefined,
+				clientId: clientId || undefined,
+				serverIpv4: connectedServer ? { address: connectedServer.ip, port: connectedServer.port } : undefined,
+				serverName: connectedServer?.name,
+				serverDescription: connectedServer?.description,
+			};
 		}
 
 		// Fallback for ID if not in connState
@@ -79,6 +133,7 @@ export class StatsResponseParser {
 			ed2kId,
 			kadId,
 			connectedServer,
+			connectionState,
 			uploadOverhead: Number(uploadOverhead),
 			downloadOverhead: Number(downloadOverhead),
 			bannedCount: Number(bannedCount),

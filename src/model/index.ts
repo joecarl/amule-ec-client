@@ -43,7 +43,8 @@ export interface AmuleTransferringFile extends AmuleFile {
 	downloadActiveTime?: number;
 	availablePartCount?: number;
 	a4AFAuto?: boolean;
-	hashingProgress?: boolean;
+	/** Number of already-hashed parts while the file is being (re)hashed */
+	hashedPartCount?: number;
 	getLostDueToCorruption?: number;
 	getGainDueToCompression?: number;
 	totalPacketsSavedDueToICH?: number;

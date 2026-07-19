@@ -33,13 +33,8 @@ export interface ConnectionState {
 	clientId?: number;
 }
 
-export enum SearchFileDownloadStatus {
-	NEW = 0,
-	DOWNLOADED = 1,
-	QUEUED = 2,
-	CANCELED = 3,
-	QUEUEDCANCELED = 4,
-}
+// Backwards-compatible alias: the canonical enum lives with the other EC protocol codes
+export { ECSearchFileDownloadStatus as SearchFileDownloadStatus } from '../ec/Codes';
 
 export enum BuddyState {
 	Disconnected = 0,
