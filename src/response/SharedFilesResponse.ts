@@ -6,7 +6,7 @@ import { Packet } from '../ec/packet/Packet';
 import { ECTagName } from '../ec/Codes';
 import { findNumericTag, findTag } from '../ec/tag/Tag';
 import type { AmuleFile } from '../model';
-import { toOptionalNumber } from './utils';
+import { tagOwnNumericValue, toOptionalNumber } from './utils';
 
 export interface SharedFilesResponse {
 	files: AmuleFile[];
@@ -26,6 +26,7 @@ export class SharedFilesResponseParser {
 			const fileNameTag = findTag(tags, ECTagName.EC_TAG_PARTFILE_NAME);
 
 			const file: AmuleFile = {
+				ecid: tagOwnNumericValue(fileTag),
 				fileHashHexString: hashTag ? hashTag.getValue().toString('hex') : undefined,
 				fileName: fileNameTag ? fileNameTag.getValue() : undefined,
 				filePath: findTag(tags, ECTagName.EC_TAG_KNOWNFILE_FILENAME)?.getValue(),

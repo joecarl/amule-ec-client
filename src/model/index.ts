@@ -1,6 +1,10 @@
 // Model types and interfaces
 
+import type { ChunkInfo, SourceNameCount } from '../types/download-details';
+
 export interface AmuleFile {
+	/** ECID assigned by the daemon (EC protocol >= 0x0204). Stable while the daemon runs, used to link clients to files. */
+	ecid?: number;
 	fileHashHexString?: string;
 	fileName?: string;
 	filePath?: string;
@@ -44,6 +48,10 @@ export interface AmuleTransferringFile extends AmuleFile {
 	getGainDueToCompression?: number;
 	totalPacketsSavedDueToICH?: number;
 	a4afSources?: number[];
+	chunkInfo?: ChunkInfo;
+	/** Per-peer info of the sources of this download. Only filled by update-based methods (see AmuleClient.getDownloadQueueWithSources). */
+	sources?: AmuleUpDownClient[];
+	sourceNames?: SourceNameCount[];
 }
 
 export interface AmuleCategory {
@@ -72,6 +80,8 @@ export interface AmuleServer {
 }
 
 export interface AmuleUpDownClient {
+	/** ECID assigned by the daemon. Used to link this client to files via requestFileId/uploadFileId. */
+	ecid?: number;
 	clientName?: string;
 	userHashHexString?: string;
 	userID?: number;

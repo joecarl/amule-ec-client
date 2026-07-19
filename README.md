@@ -5,7 +5,7 @@
 
 A TypeScript client library for interacting with aMule's External Connection (EC) protocol.
 
-Ported from [jamule](https://github.com/vexdev/jamule) (Java/Kotlin) to TypeScript.
+This project started as a port from [jamule](https://github.com/vexdev/jamule) (Java/Kotlin) to TypeScript. But as of the date this readme was last updated, this project covers wider functionality.
 
 ## Features
 
@@ -14,6 +14,7 @@ Ported from [jamule](https://github.com/vexdev/jamule) (Java/Kotlin) to TypeScri
 - ✅ Server statistics
 - ✅ File searching (local, global, Kad, web)
 - ✅ Download management
+- ✅ Per-peer source details for active downloads (via incremental updates)
 - ✅ Shared files listing
 - ✅ Category management
 - ✅ ED2K link parsing
@@ -76,12 +77,15 @@ Options:
 - `port`: EC port (default: 4712)
 - `password`: EC password
 - `timeout`: Connection timeout in ms (optional)
+- `requestTimeout`: Per-request response timeout in ms (optional, `0` disables)
 
 #### Methods
 
 **Connection**
 
 - `reconnect(): Promise<void>` - Reconnect to server
+- `setRequestTimeout(timeoutMs: number): void` - Set default timeout for request responses
+- `getRequestTimeout(): number` - Get current default request timeout
 
 **Statistics**
 
@@ -98,7 +102,13 @@ Options:
 **Downloads**
 
 - `downloadSearchResult(hash, category?): Promise<void>` - Download from search results
-- `getDownloadQueue(): Promise<AmuleTransferringFile[]>` - Get download queue
+- `getDownloadQueue(): Promise<AmuleTransferringFile[]>` - Get download queue (chunk info and source name buckets, but no per-peer details)
+- `getDownloadQueueWithSources(): Promise<AmuleTransferringFile[]>` - Get download queue with `sources` filled with the connected peers of each download (name, IP, software, speeds, queue rank, ...)
+- `getUpdate(): Promise<UpdateResponse>` - Incremental update snapshot: downloads (with `sources`), shared files and clients. The daemon sends per-connection diffs; the client merges them internally, so every call returns full objects
+
+> **Note:** aMule only exposes per-peer info through the incremental update mechanism (`EC_OP_GET_UPDATE`), never nested inside `EC_OP_GET_DLOAD_QUEUE` responses. Peers are linked to downloads through `client.requestFileId === file.ecid`. The internal cache is per connection and resets automatically on reconnect.
+>
+> `sourceNames` (the filenames under which the sources share each file) is also sent by the daemon as a per-connection incremental map — even for full-detail `getDownloadQueue()` requests. `getDownloadQueue()` therefore returns complete name buckets only on the first call of a connection; the update-based methods merge the diffs and are always complete.
 
 **Shared Files**
 
@@ -112,6 +122,7 @@ This library implements the aMule External Connection protocol version 0x0204, c
 - aMule 2.3.2
 - aMule 2.3.3
 - aMule 3.0.0
+- aMule 3.0.1
 
 ### Protocol Features
 

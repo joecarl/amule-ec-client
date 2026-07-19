@@ -20,7 +20,21 @@ export { ECOpCode, ECTagName, ECDetailLevel, ECSearchType, EcPrefs, ProtocolVers
 export { AmuleException, InvalidECException, CommunicationException, ServerException } from './exceptions';
 
 // Types
-export type { SearchFilters, ConnectionState, SearchFileDownloadStatus } from './types';
+export { PARTSIZE, ChunkStatus } from './types';
+export type {
+	SearchFilters,
+	ConnectionState,
+	SearchFileDownloadStatus,
+	AmulePreferences,
+	AmulePrefsGeneral,
+	AmulePrefsConnection,
+	AmulePrefsServers,
+	AmulePrefsSecurity,
+	ChunkInfo,
+	SourceNameCount,
+	SourceNameEntry,
+	PartFileStatusBuffers,
+} from './types';
 
 // Protocol components (for advanced usage)
 export { Packet } from './ec/packet/Packet';

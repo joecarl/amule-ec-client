@@ -19,3 +19,15 @@ export function toOptionalIp(value: number | undefined): string | undefined {
 	if (value === undefined) return undefined;
 	return formatIp(value);
 }
+
+/**
+ * Read the own numeric value of a tag (e.g. the ECID carried by EC_TAG_PARTFILE / EC_TAG_CLIENT container tags).
+ * Returns undefined when the tag value is not numeric (string, buffer, ...).
+ */
+export function tagOwnNumericValue(tag: { getValue(): unknown } | undefined): number | undefined {
+	if (!tag) return undefined;
+	const value = tag.getValue();
+	if (typeof value === 'number') return value;
+	if (typeof value === 'bigint') return Number(value);
+	return undefined;
+}

@@ -46,3 +46,6 @@ export enum BuddyState {
 	Connecting = 1,
 	Connected = 2,
 }
+
+export * from './preferences';
+export * from './download-details';

@@ -13,15 +13,20 @@ import type { Request } from '../request/Request';
 import { AuthSaltResponse } from '../response/AuthSaltResponse';
 import { PasswordHasher } from '../auth/PasswordHasher';
 
+interface IPendingResponse {
+	resolve: (packet: Packet) => void;
+	reject: (error: Error) => void;
+	timeoutHandle?: NodeJS.Timeout;
+}
+
 export class AmuleConnection {
 	private socket?: net.Socket;
 	private connected = false;
 	private buffer: Buffer = Buffer.allocUnsafe(0);
-	private pendingResponses: {
-		resolve: (packet: Packet) => void;
-		reject: (error: Error) => void;
-	}[] = [];
+	private pendingResponses: IPendingResponse[] = [];
 	private connectionPromise?: Promise<void>;
+	private requestTimeout = 0;
+	private sessionGeneration = 0;
 
 	// Debug logging flag (disabled by default)
 	private debug = false;
@@ -47,8 +52,47 @@ export class AmuleConnection {
 		private host: string,
 		private port: number,
 		private password: string,
-		private timeout: number
-	) {}
+		private timeout: number,
+		requestTimeout: number = 0
+	) {
+		this.requestTimeout = Math.max(0, requestTimeout);
+	}
+
+	/**
+	 * Set default timeout for a single request/response cycle.
+	 * Use 0 to disable.
+	 */
+	public setRequestTimeout(timeoutMs: number): void {
+		this.requestTimeout = Math.max(0, timeoutMs || 0);
+	}
+
+	/**
+	 * Get current default timeout for requests.
+	 */
+	public getRequestTimeout(): number {
+		return this.requestTimeout;
+	}
+
+	/**
+	 * Monotonic counter incremented on every (re)connection attempt.
+	 * Lets consumers detect that the daemon-side per-connection state was reset.
+	 */
+	public getSessionGeneration(): number {
+		return this.sessionGeneration;
+	}
+
+	/**
+	 * Reject and clear all pending responses.
+	 */
+	private rejectAllPending(error: Error): void {
+		while (this.pendingResponses.length > 0) {
+			const pending = this.pendingResponses.shift();
+			if (pending?.timeoutHandle) {
+				clearTimeout(pending.timeoutHandle);
+			}
+			pending?.reject(error);
+		}
+	}
 
 	/**
 	 * Reconnect to the server
@@ -60,6 +104,9 @@ export class AmuleConnection {
 
 		this.connectionPromise = (async () => {
 			this.connected = false;
+			// The daemon keeps per-connection incremental state (EC_OP_GET_UPDATE); a new
+			// connection starts from scratch, so consumers tracking state must reset too.
+			this.sessionGeneration++;
 			if (this.socket) {
 				this.socket.destroy();
 			}
@@ -192,10 +239,7 @@ export class AmuleConnection {
 	 */
 	private handleError(error: Error): void {
 		this.connected = false;
-		while (this.pendingResponses.length > 0) {
-			const pending = this.pendingResponses.shift();
-			pending?.reject(new CommunicationException(`Socket error: ${error.message}`));
-		}
+		this.rejectAllPending(new CommunicationException(`Socket error: ${error.message}`));
 	}
 
 	/**
@@ -203,10 +247,7 @@ export class AmuleConnection {
 	 */
 	private handleTimeout(): void {
 		this.connected = false;
-		while (this.pendingResponses.length > 0) {
-			const pending = this.pendingResponses.shift();
-			pending?.reject(new CommunicationException('Socket timeout'));
-		}
+		this.rejectAllPending(new CommunicationException('Socket timeout'));
 	}
 
 	/**
@@ -215,22 +256,19 @@ export class AmuleConnection {
 	private handleClose(): void {
 		this.log('Socket closed! connected:', this.connected, 'pendingResponses:', this.pendingResponses.length);
 		this.connected = false;
-		while (this.pendingResponses.length > 0) {
-			const pending = this.pendingResponses.shift();
-			pending?.reject(new CommunicationException('Socket closed'));
-		}
+		this.rejectAllPending(new CommunicationException('Socket closed'));
 	}
 
 	/**
 	 * Send a request and wait for response
 	 */
-	async sendRequest(request: Request): Promise<Packet> {
+	async sendRequest(request: Request, timeoutMs?: number): Promise<Packet> {
 		if (!this.connected) {
 			await this.reconnect();
 		}
 
 		try {
-			return await this.sendRequestNoAuth(request);
+			return await this.sendRequestNoAuth(request, timeoutMs);
 		} catch (error) {
 			this.connected = false;
 			throw error;
@@ -240,7 +278,7 @@ export class AmuleConnection {
 	/**
 	 * Send a request without checking authentication
 	 */
-	private async sendRequestNoAuth(request: Request): Promise<Packet> {
+	private async sendRequestNoAuth(request: Request, timeoutMs?: number): Promise<Packet> {
 		if (!this.socket) {
 			throw new CommunicationException('Socket not initialized');
 		}
@@ -252,7 +290,36 @@ export class AmuleConnection {
 
 		// Create promise for response
 		const responsePromise = new Promise<Packet>((resolve, reject) => {
-			this.pendingResponses.push({ resolve, reject });
+			const pending: IPendingResponse = {
+				resolve: (packet: Packet) => {
+					if (pending.timeoutHandle) {
+						clearTimeout(pending.timeoutHandle);
+					}
+					resolve(packet);
+				},
+				reject: (error: Error) => {
+					if (pending.timeoutHandle) {
+						clearTimeout(pending.timeoutHandle);
+					}
+					reject(error);
+				},
+			};
+
+			const effectiveTimeout = timeoutMs ?? this.requestTimeout;
+			if (effectiveTimeout > 0) {
+				pending.timeoutHandle = setTimeout(() => {
+					if (!this.pendingResponses.includes(pending)) {
+						return;
+					}
+					this.connected = false;
+					this.rejectAllPending(new CommunicationException(`Request timeout after ${effectiveTimeout}ms`));
+					if (this.socket && !this.socket.destroyed) {
+						this.socket.destroy();
+					}
+				}, effectiveTimeout);
+			}
+
+			this.pendingResponses.push(pending);
 		});
 
 		// Send packet

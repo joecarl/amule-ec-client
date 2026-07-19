@@ -6,7 +6,8 @@ import { Packet } from '../ec/packet/Packet';
 import { ECTagName } from '../ec/Codes';
 import { findNumericTag, findTag } from '../ec/tag/Tag';
 import type { AmuleTransferringFile, FileStatus } from '../model';
-import { toOptionalBool, toOptionalNumber } from './utils';
+import { DownloadChunkDetailsResponseParser, DownloadSourceNamesResponseParser } from './DownloadDetailsResponse';
+import { tagOwnNumericValue, toOptionalBool, toOptionalNumber } from './utils';
 
 export interface DownloadQueueResponse {
 	files: AmuleTransferringFile[];
@@ -15,6 +16,8 @@ export interface DownloadQueueResponse {
 export class DownloadQueueResponseParser {
 	static fromPacket(packet: Packet): DownloadQueueResponse {
 		const files: AmuleTransferringFile[] = [];
+		const chunkDetailsByHash = DownloadChunkDetailsResponseParser.fromPacket(packet);
+		const sourceNamesByHash = DownloadSourceNamesResponseParser.fromPacket(packet);
 
 		// Find all partfile tags
 		const partfileTags = packet.tags.filter((tag) => tag.name === ECTagName.EC_TAG_PARTFILE);
@@ -39,6 +42,7 @@ export class DownloadQueueResponseParser {
 
 			// Basic file info
 			const file: AmuleTransferringFile = {
+				ecid: tagOwnNumericValue(fileTag),
 				fileHashHexString: hashTag ? hashTag.getValue().toString('hex') : undefined,
 				fileName: fileNameTag ? fileNameTag.getValue() : undefined,
 				filePath: findTag(tags, ECTagName.EC_TAG_KNOWNFILE_FILENAME)?.getValue(),
@@ -86,6 +90,11 @@ export class DownloadQueueResponseParser {
 				getRating: findNumericTag(tags, ECTagName.EC_TAG_KNOWNFILE_RATING)?.getInt(),
 				a4afSources,
 			};
+
+			if (file.fileHashHexString) {
+				file.chunkInfo = chunkDetailsByHash[file.fileHashHexString];
+				file.sourceNames = sourceNamesByHash[file.fileHashHexString];
+			}
 
 			files.push(file);
 		}

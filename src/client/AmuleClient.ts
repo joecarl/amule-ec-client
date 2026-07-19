@@ -3,16 +3,19 @@
  */
 
 import { AmuleConnection } from './AmuleConnection';
+import type { UpdateState } from './UpdateState';
 import type { AmuleFile, AmuleTransferringFile, AmuleCategory, AmuleServer, SearchType, AmuleUpDownClient, AmuleFriend } from '../model';
 import { DownloadCommand } from '../model';
 import type { SearchFilters } from '../types';
 import { EcPrefs, ECDetailLevel } from '../ec/Codes';
+import type { AmulePreferences } from '../types/preferences';
 
 export interface AmuleClientOptions {
 	host: string;
 	port: number;
 	password: string;
 	timeout?: number;
+	requestTimeout?: number;
 }
 
 export interface StatsResponse {
@@ -67,15 +70,33 @@ export interface UpdateResponse {
 
 export class AmuleClient {
 	private connection: AmuleConnection;
+	private updateState?: UpdateState;
 
 	constructor(options: AmuleClientOptions) {
-		this.connection = new AmuleConnection(options.host, options.port, options.password, options.timeout || 0);
+		this.connection = new AmuleConnection(options.host, options.port, options.password, options.timeout || 0, options.requestTimeout || 0);
+	}
+
+	/**
+	 * Set default timeout for individual request/response cycles.
+	 * Use 0 to disable request timeout.
+	 */
+	setRequestTimeout(timeoutMs: number): void {
+		this.connection.setRequestTimeout(timeoutMs);
+	}
+
+	/**
+	 * Get current default timeout for requests.
+	 */
+	getRequestTimeout(): number {
+		return this.connection.getRequestTimeout();
 	}
 
 	/**
 	 * Reconnect to the server
 	 */
 	async reconnect(): Promise<void> {
+		// The daemon tracks incremental update state per connection, so ours must go too
+		this.updateState = undefined;
 		await this.connection.reconnect();
 	}
 
@@ -93,16 +114,41 @@ export class AmuleClient {
 	}
 
 	/**
-	 * Get incremental updates for files, clients, servers, and friends
+	 * Get updates for files, clients, servers, and friends.
+	 *
+	 * The underlying EC_OP_GET_UPDATE request is incremental per connection: the daemon
+	 * only sends the fields that changed since the previous call. This method keeps a
+	 * client-side cache and merges those diffs, so it always returns full snapshots.
+	 * Downloads carry their connected peers in `sources` (linked via client requestFileId
+	 * and file ecid). The cache is reset whenever the connection is re-established.
 	 */
 	async getUpdate(detailLevel: ECDetailLevel = ECDetailLevel.EC_DETAIL_INC_UPDATE): Promise<UpdateResponse> {
 		const { UpdateRequest } = await import('../request/UpdateRequest');
-		const { UpdateResponseParser } = await import('../response/UpdateResponse');
+		const { UpdateState } = await import('./UpdateState');
 
 		const request = new UpdateRequest(detailLevel);
 		const packet = await this.connection.sendRequest(request);
 
-		return UpdateResponseParser.fromPacket(packet);
+		// sendRequest may have (re)connected: daemon-side diff state started over
+		const generation = this.connection.getSessionGeneration();
+		if (!this.updateState || this.updateState.sessionGeneration !== generation) {
+			this.updateState = new UpdateState(generation);
+		}
+
+		return this.updateState.apply(packet);
+	}
+
+	/**
+	 * Get the download queue including per-peer source details.
+	 *
+	 * Unlike getDownloadQueue() (EC_OP_GET_DLOAD_QUEUE, which never includes peers),
+	 * this uses the incremental update mechanism (see getUpdate), the only way the
+	 * daemon exposes the clients each download is fed from. Each returned file has
+	 * `sources` filled with the currently connected peers for that download.
+	 */
+	async getDownloadQueueWithSources(): Promise<AmuleTransferringFile[]> {
+		const update = await this.getUpdate();
+		return update.downloadQueue;
 	}
 
 	/**
@@ -367,5 +413,53 @@ export class AmuleClient {
 	 */
 	async deleteDownload(hash: Buffer): Promise<void> {
 		await this.sendDownloadCommand(hash, DownloadCommand.DELETE);
+	}
+
+	/**
+	 * Trigger a server list update from an URL.
+	 */
+	async updateServerListFromUrl(url: string): Promise<void> {
+		const { ServerUpdateFromUrlRequest } = await import('../request/ServerUpdateFromUrlRequest');
+
+		const request = new ServerUpdateFromUrlRequest(url);
+		await this.connection.sendRequest(request);
+	}
+
+	/**
+	 * Set upload priority for a shared file.
+	 */
+	async setSharedFilePriority(hash: Buffer, priority: number): Promise<void> {
+		const { SharedFilePriorityRequest } = await import('../request/SharedFilePriorityRequest');
+
+		const request = new SharedFilePriorityRequest(hash, priority);
+		await this.connection.sendRequest(request);
+	}
+
+	/**
+	 * Get daemon preferences for general/connection/servers/security sections.
+	 */
+	async getPreferences(): Promise<AmulePreferences> {
+		const { GetPreferencesRequest } = await import('../request/GetPreferencesRequest');
+		const { PreferencesDetailsResponseParser } = await import('../response/PreferencesDetailsResponse');
+
+		const prefMask = EcPrefs.EC_PREFS_GENERAL | EcPrefs.EC_PREFS_CONNECTIONS | EcPrefs.EC_PREFS_SERVERS | EcPrefs.EC_PREFS_SECURITY;
+
+		const request = new GetPreferencesRequest(prefMask);
+		const packet = await this.connection.sendRequest(request);
+		return PreferencesDetailsResponseParser.fromPacket(packet).preferences;
+	}
+
+	/**
+	 * Set daemon preferences. Only sections present in the input object are sent.
+	 */
+	async setPreferences(preferences: Partial<AmulePreferences>): Promise<void> {
+		if (!preferences.general && !preferences.connection && !preferences.servers && !preferences.security) {
+			return;
+		}
+
+		const { SetPreferencesRequest } = await import('../request/SetPreferencesRequest');
+
+		const request = new SetPreferencesRequest(preferences);
+		await this.connection.sendRequest(request);
 	}
 }

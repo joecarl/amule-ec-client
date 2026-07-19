@@ -5,7 +5,7 @@
 import { Packet } from '../ec/packet/Packet';
 import { ECTagName } from '../ec/Codes';
 import { findNumericTag, findTag } from '../ec/tag/Tag';
-import { toOptionalBool, toOptionalIp, toOptionalNumber } from './utils';
+import { tagOwnNumericValue, toOptionalBool, toOptionalIp, toOptionalNumber } from './utils';
 import { AmuleUpDownClient } from '../model';
 
 export interface ClientQueueResponse {
@@ -27,6 +27,7 @@ export class ClientQueueResponseParser {
 			const tags = clientTag.nestedTags || [];
 
 			const client: AmuleUpDownClient = {
+				ecid: tagOwnNumericValue(clientTag),
 				clientName: findTag(tags, ECTagName.EC_TAG_CLIENT_NAME)?.getValue(),
 				userHashHexString: findTag(tags, ECTagName.EC_TAG_CLIENT_HASH)?.getValue()?.toString('hex'),
 				userID: findNumericTag(tags, ECTagName.EC_TAG_CLIENT_USER_ID)?.getInt(),
