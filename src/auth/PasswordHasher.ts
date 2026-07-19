@@ -8,8 +8,8 @@ export class PasswordHasher {
 	/**
 	 * Hash a password with salt using MD5
 	 *
-	 * This matches aMule's password hashing algorithm (from jamule):
-	 * 1. saltHash = MD5(salt.toHexString().uppercase())
+	 * This matches aMule's password hashing algorithm (ExternalConn.cpp):
+	 * 1. saltHash = MD5(salt formatted as "%lX")
 	 * 2. passwordHash = MD5(password)
 	 * 3. return MD5(passwordHash.toHex().lowercase() + saltHash.toHex().lowercase())
 	 *
@@ -18,8 +18,9 @@ export class PasswordHasher {
 	 * @returns The hashed password as a Buffer
 	 */
 	static hash(password: string, salt: bigint): Buffer {
-		// Step 1: Hash the salt (as uppercase hex string)
-		const saltHexUpper = salt.toString(16).toUpperCase().padStart(16, '0');
+		// Step 1: Hash the salt. aMule formats it with "%lX": uppercase hex WITHOUT
+		// leading zeros — padding it breaks auth whenever the salt's top nibble is 0.
+		const saltHexUpper = salt.toString(16).toUpperCase();
 		const saltHash = crypto.createHash('md5').update(saltHexUpper, 'utf-8').digest();
 
 		// Step 2: Hash the password

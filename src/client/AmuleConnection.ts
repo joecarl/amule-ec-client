@@ -7,7 +7,8 @@ import { CommunicationException, ServerException } from '../exceptions';
 import { Packet } from '../ec/packet/Packet';
 import { PacketParser } from '../ec/packet/PacketParser';
 import { PacketWriter } from '../ec/packet/PacketWriter';
-import { ECOpCode } from '../ec/Codes';
+import { ECOpCode, ECTagName } from '../ec/Codes';
+import { findTag } from '../ec/tag/Tag';
 import { AuthClientInfoRequest, AuthPasswordRequest } from '../request/AuthRequest';
 import type { Request } from '../request/Request';
 import { AuthSaltResponse } from '../response/AuthSaltResponse';
@@ -111,6 +112,10 @@ export class AmuleConnection {
 				this.socket.destroy();
 			}
 
+			// Discard partial data left over from the previous connection: stale bytes
+			// would desync packet framing for the whole new session.
+			this.buffer = Buffer.allocUnsafe(0);
+
 			// Create new socket
 			this.socket = new net.Socket();
 			if (this.timeout > 0) {
@@ -176,7 +181,9 @@ export class AmuleConnection {
 		this.log('Received salt response');
 
 		if (saltPacket.opCode === ECOpCode.EC_OP_AUTH_FAIL) {
-			throw new ServerException('Authentication failed: server rejected client');
+			const fallbackReason =
+				'connection refused with no reason; the daemon usually does this when its EC password is empty (external connections disabled)';
+			throw new ServerException(`Authentication failed: ${AmuleConnection.authFailReason(saltPacket) ?? fallbackReason}`);
 		}
 
 		if (saltPacket.opCode !== ECOpCode.EC_OP_AUTH_SALT) {
@@ -197,13 +204,21 @@ export class AmuleConnection {
 		this.log('Received auth response');
 
 		if (authPacket.opCode === ECOpCode.EC_OP_AUTH_FAIL) {
-			throw new ServerException('Authentication failed: invalid password');
+			throw new ServerException(`Authentication failed: ${AmuleConnection.authFailReason(authPacket) ?? 'unknown reason'}`);
 		}
 
 		if (authPacket.opCode !== ECOpCode.EC_OP_AUTH_OK) {
 			throw new ServerException(`Unexpected auth response: ${authPacket.opCode}`);
 		}
 		this.log('Authentication successful!');
+	}
+
+	/**
+	 * Extract the human-readable reason the daemon attaches to EC_OP_AUTH_FAIL packets.
+	 */
+	private static authFailReason(packet: Packet): string | undefined {
+		const reason = findTag(packet.tags, ECTagName.EC_TAG_STRING)?.getValue();
+		return typeof reason === 'string' && reason.length > 0 ? reason : undefined;
 	}
 
 	/**
