@@ -200,8 +200,10 @@ export class TagParser {
 			}
 
 			case ECTagType.EC_TAGTYPE_DOUBLE: {
-				const numValue = value.length >= 8 ? value.readDoubleBE(0) : 0;
-				return new DoubleTag(name, numValue);
+				// Transmitted as a null-terminated ASCII decimal string
+				const tag = new DoubleTag(name);
+				tag.parseValue(value);
+				return tag;
 			}
 
 			case ECTagType.EC_TAGTYPE_IPV4: {

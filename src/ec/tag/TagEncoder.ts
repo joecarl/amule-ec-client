@@ -135,7 +135,8 @@ export class TagEncoder {
 				return 16;
 
 			case ECTagType.EC_TAGTYPE_DOUBLE:
-				return 8;
+				// Null-terminated ASCII decimal string, variable length
+				return encoded.length;
 
 			case ECTagType.EC_TAGTYPE_IPV4:
 				return 6; // 4 bytes IP + 2 bytes port

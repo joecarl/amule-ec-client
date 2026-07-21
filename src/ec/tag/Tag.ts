@@ -286,7 +286,11 @@ export class StringTag extends Tag<string> {
 	}
 }
 
-export class DoubleTag extends Tag<number> {
+/**
+ * EC_TAGTYPE_DOUBLE tags are transmitted as a null-terminated ASCII decimal string,
+ * not as a binary double (see CECTag(ec_tagname_t, double) in aMule's ECTag.cpp).
+ */
+export class DoubleTag extends Tag<number> implements NumericTag {
 	constructor(name: ECTagName, value?: number, subtags: Tag<any>[] = [], nameValue: number = name) {
 		super(name, ECTagType.EC_TAGTYPE_DOUBLE, subtags, nameValue);
 		if (value !== undefined) {
@@ -299,14 +303,25 @@ export class DoubleTag extends Tag<number> {
 	}
 
 	parseValue(value: Buffer): void {
-		const numValue = value.length >= 8 ? value.readDoubleBE(0) : 0;
-		this.setValue(numValue);
+		const end = value.length > 0 && value[value.length - 1] === 0x00 ? value.length - 1 : value.length;
+		const numValue = Number.parseFloat(value.toString('utf8', 0, end));
+		this.setValue(Number.isNaN(numValue) ? 0 : numValue);
 	}
 
 	encodeValue(): Buffer {
-		const buf = Buffer.allocUnsafe(8);
-		buf.writeDoubleBE(this.getValue());
-		return buf;
+		return Buffer.concat([Buffer.from(this.getValue().toString(), 'utf8'), Buffer.from([0x00])]);
+	}
+
+	getShort(): number {
+		return this.getValue();
+	}
+
+	getInt(): number {
+		return this.getValue();
+	}
+
+	getLong(): bigint {
+		return BigInt(Math.round(this.getValue()));
 	}
 }
 
