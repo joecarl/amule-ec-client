@@ -70,6 +70,23 @@ export class AmuleClient {
 	}
 
 	/**
+	 * Per-connection file-detail state (diff baselines, source names, merged snapshots).
+	 * The daemon diffs per connection and shares the diff state between the update,
+	 * download-queue and shared-files requests, so this state must be fed by all of
+	 * them (see UpdateState). Call only after sendRequest: connecting may have started
+	 * a new session, which invalidates the previous state.
+	 */
+	private async getFileState(): Promise<UpdateState> {
+		const { UpdateState } = await import('./UpdateState');
+
+		const generation = this.connection.getSessionGeneration();
+		if (!this.updateState || this.updateState.sessionGeneration !== generation) {
+			this.updateState = new UpdateState(generation);
+		}
+		return this.updateState;
+	}
+
+	/**
 	 * Get updates for files, clients, servers, and friends.
 	 *
 	 * The underlying EC_OP_GET_UPDATE request is incremental per connection: the daemon
@@ -80,18 +97,12 @@ export class AmuleClient {
 	 */
 	async getUpdate(detailLevel: ECDetailLevel = ECDetailLevel.EC_DETAIL_INC_UPDATE): Promise<UpdateResponse> {
 		const { UpdateRequest } = await import('../request/UpdateRequest');
-		const { UpdateState } = await import('./UpdateState');
 
 		const request = new UpdateRequest(detailLevel);
 		const packet = await this.connection.sendRequest(request);
 
-		// sendRequest may have (re)connected: daemon-side diff state started over
-		const generation = this.connection.getSessionGeneration();
-		if (!this.updateState || this.updateState.sessionGeneration !== generation) {
-			this.updateState = new UpdateState(generation);
-		}
-
-		return this.updateState.apply(packet);
+		const state = await this.getFileState();
+		return state.apply(packet);
 	}
 
 	/**
@@ -200,16 +211,21 @@ export class AmuleClient {
 	}
 
 	/**
-	 * Get download queue
+	 * Get download queue (EC_OP_GET_DLOAD_QUEUE, full detail).
+	 *
+	 * The response rebases the per-connection diff state the daemon shares with
+	 * getUpdate()/getDownloadQueueWithSources(), so it is fed into the same
+	 * client-side state: both methods stay consistent however they are interleaved,
+	 * and chunkInfo/sourceNames are correct across repeated calls.
 	 */
 	async getDownloadQueue(): Promise<AmuleTransferringFile[]> {
 		const { DownloadQueueRequest } = await import('../request/DownloadQueueRequest');
-		const { DownloadQueueResponseParser } = await import('../response/DownloadQueueResponse');
 
 		const request = new DownloadQueueRequest();
 		const packet = await this.connection.sendRequest(request);
 
-		return DownloadQueueResponseParser.fromPacket(packet).files;
+		const state = await this.getFileState();
+		return state.applyDownloadQueue(packet);
 	}
 
 	/**
@@ -221,6 +237,11 @@ export class AmuleClient {
 
 		const request = new SharedFilesRequest();
 		const packet = await this.connection.sendRequest(request);
+
+		// Shared partfiles are encoded through the same per-connection diff encoders
+		// as the download paths; record the rebased baselines
+		const state = await this.getFileState();
+		state.applySharedFiles(packet);
 
 		return SharedFilesResponseParser.fromPacket(packet).files;
 	}

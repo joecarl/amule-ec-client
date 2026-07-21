@@ -3,7 +3,9 @@ import { AmuleClient } from '../src/client/AmuleClient';
 import { ECOpCode, ECTagName } from '../src/ec/Codes';
 import { Flags } from '../src/ec/packet/Flags';
 import { Packet } from '../src/ec/packet/Packet';
-import { CustomTag, Hash16Tag, StringTag, UByteTag, UIntTag } from '../src/ec/tag/Tag';
+import { CustomTag, DoubleTag, Hash16Tag, StringTag, UByteTag, UIntTag, findNumericTag } from '../src/ec/tag/Tag';
+import { PacketWriter } from '../src/ec/packet/PacketWriter';
+import { PacketParser } from '../src/ec/packet/PacketParser';
 import { ChunkStatus, PARTSIZE } from '../src/types/download-details';
 
 function createClientWithPackets(packets: Packet[]) {
@@ -50,6 +52,17 @@ function rleEncodeAsSingles(bytes: number[]): Buffer {
 		encoded.push(value, value, 1);
 	}
 	return Buffer.from(encoded);
+}
+
+/**
+ * Byte-wise XOR of two equal-length arrays, as the daemon's differential RLE encoder
+ * produces (RLE_Data::Encode with use_diff).
+ */
+function xorBytes(a: number[], b: number[]): number[] {
+	if (a.length !== b.length) {
+		throw new Error('xorBytes requires equal-length inputs');
+	}
+	return a.map((value, i) => value ^ b[i]);
 }
 
 describe('additional methods', () => {
@@ -212,7 +225,8 @@ describe('additional methods', () => {
 		]);
 		const fullPeer = new UIntTag(ECTagName.EC_TAG_CLIENT, 55, [
 			new StringTag(ECTagName.EC_TAG_CLIENT_NAME, 'Peer-1'),
-			new UIntTag(ECTagName.EC_TAG_CLIENT_DOWN_SPEED, 500),
+			// The daemon sends per-client download speed as a double in kB/s
+			new DoubleTag(ECTagName.EC_TAG_CLIENT_DOWN_SPEED, 0.5),
 			new UIntTag(ECTagName.EC_TAG_CLIENT_REQUEST_FILE, 123),
 		]);
 		const firstPacket = new Packet(ECOpCode.EC_OP_STATS, Flags.useUtf8Numbers(), [
@@ -230,7 +244,7 @@ describe('additional methods', () => {
 				new UIntTag(ECTagName.EC_TAG_PARTFILE_SOURCE_NAMES, 2, [new UIntTag(ECTagName.EC_TAG_PARTFILE_SOURCE_NAMES_COUNTS, 0)]),
 			]),
 		]);
-		const diffPeer = new UIntTag(ECTagName.EC_TAG_CLIENT, 55, [new UIntTag(ECTagName.EC_TAG_CLIENT_DOWN_SPEED, 900)]);
+		const diffPeer = new UIntTag(ECTagName.EC_TAG_CLIENT, 55, [new DoubleTag(ECTagName.EC_TAG_CLIENT_DOWN_SPEED, 12.5)]);
 		const secondPacket = new Packet(ECOpCode.EC_OP_STATS, Flags.useUtf8Numbers(), [
 			diffPartFile,
 			new CustomTag(ECTagName.EC_TAG_CLIENT, Buffer.alloc(0), [diffPeer]),
@@ -247,7 +261,8 @@ describe('additional methods', () => {
 		const first = await client.getUpdate();
 		expect(first.downloadQueue[0].speed).toBe(1000);
 		expect(first.downloadQueue[0].chunkInfo?.availability).toEqual([0, 2]);
-		expect(first.downloadQueue[0].sources?.[0].downSpeed).toBe(500);
+		// 0.5 kB/s normalized to bytes/s
+		expect(first.downloadQueue[0].sources?.[0].downSpeed).toBe(512);
 		expect(first.downloadQueue[0].sourceNames).toEqual([
 			{ name: 'name-a', count: 3 },
 			{ name: 'name-b', count: 1 },
@@ -262,7 +277,7 @@ describe('additional methods', () => {
 		expect(second.downloadQueue[0].chunkInfo?.availability).toEqual([1, 2]);
 		expect(second.downloadQueue[0].sources?.length).toBe(1);
 		expect(second.downloadQueue[0].sources?.[0].clientName).toBe('Peer-1');
-		expect(second.downloadQueue[0].sources?.[0].downSpeed).toBe(900);
+		expect(second.downloadQueue[0].sources?.[0].downSpeed).toBe(12800);
 		// Source names map diff applied: count updated without resending the name, entry 2 removed
 		expect(second.downloadQueue[0].sourceNames).toEqual([{ name: 'name-a', count: 5 }]);
 
@@ -272,5 +287,212 @@ describe('additional methods', () => {
 		expect(third.clients.length).toBe(0);
 		// No source-names container in the packet: accumulated state is kept
 		expect(third.downloadQueue[0].sourceNames).toEqual([{ name: 'name-a', count: 5 }]);
+	});
+});
+
+describe('per-connection diff state shared across request types', () => {
+	const hash = Buffer.from('00112233445566778899aabbccddeeff', 'hex');
+	const fullSize = PARTSIZE * 2;
+
+	function updatePartFile(ecid: number, tags: any[]) {
+		return new Packet(ECOpCode.EC_OP_STATS, Flags.useUtf8Numbers(), [new UIntTag(ECTagName.EC_TAG_PARTFILE, ecid, tags)]);
+	}
+
+	it('getDownloadQueue between updates rebases the XOR baseline (daemon resets the shared encoder)', async () => {
+		// First update of the connection: full buffers. Gap over chunk 0 only.
+		const firstUpdate = updatePartFile(123, [
+			new Hash16Tag(ECTagName.EC_TAG_PARTFILE_HASH, hash),
+			new UIntTag(ECTagName.EC_TAG_PARTFILE_SIZE_FULL, fullSize),
+			new CustomTag(ECTagName.EC_TAG_PARTFILE_PART_STATUS, rleEncodeAsSingles([1, 1])),
+			new CustomTag(ECTagName.EC_TAG_PARTFILE_GAP_STATUS, rleEncodeAsSingles(toInterleavedUint64([0, PARTSIZE]))),
+		]);
+
+		// EC_OP_GET_DLOAD_QUEUE at full detail: the daemon resets the per-connection
+		// encoders and re-encodes, so buffers are full again — and become the new baseline.
+		const dloadGaps = [0, PARTSIZE + PARTSIZE / 2];
+		const dloadQueue = new Packet(ECOpCode.EC_OP_DLOAD_QUEUE, Flags.useUtf8Numbers(), [
+			new UIntTag(ECTagName.EC_TAG_PARTFILE, 123, [
+				new Hash16Tag(ECTagName.EC_TAG_PARTFILE_HASH, hash),
+				new UIntTag(ECTagName.EC_TAG_PARTFILE_SIZE_FULL, fullSize),
+				new CustomTag(ECTagName.EC_TAG_PARTFILE_PART_STATUS, rleEncodeAsSingles([1, 1])),
+				new CustomTag(ECTagName.EC_TAG_PARTFILE_GAP_STATUS, rleEncodeAsSingles(toInterleavedUint64(dloadGaps))),
+			]),
+		]);
+
+		// Next update: XOR diff relative to what the download-queue response encoded.
+		const currentGaps = [PARTSIZE, PARTSIZE + PARTSIZE / 2];
+		const secondUpdate = updatePartFile(123, [
+			new CustomTag(ECTagName.EC_TAG_PARTFILE_GAP_STATUS, rleEncodeAsSingles(xorBytes(toInterleavedUint64(currentGaps), toInterleavedUint64(dloadGaps)))),
+		]);
+
+		const { client } = createClientWithPackets([firstUpdate, dloadQueue, secondUpdate]);
+
+		const first = await client.getDownloadQueueWithSources();
+		expect(first[0].chunkInfo?.chunks).toEqual([ChunkStatus.AVAILABLE, ChunkStatus.COMPLETE]);
+
+		const queue = await client.getDownloadQueue();
+		expect(queue[0].chunkInfo?.chunks).toEqual([ChunkStatus.AVAILABLE, ChunkStatus.AVAILABLE]);
+
+		// Without rebasing, this diff would be XORed against the first update's state
+		// and decode into garbage
+		const second = await client.getDownloadQueueWithSources();
+		expect(second[0].chunkInfo?.chunks).toEqual([ChunkStatus.COMPLETE, ChunkStatus.AVAILABLE]);
+	});
+
+	it('a present zero-length buffer resets the state to empty (RLE_Data::Decode semantics)', async () => {
+		const firstUpdate = updatePartFile(123, [
+			new Hash16Tag(ECTagName.EC_TAG_PARTFILE_HASH, hash),
+			new UIntTag(ECTagName.EC_TAG_PARTFILE_SIZE_FULL, fullSize),
+			new CustomTag(ECTagName.EC_TAG_PARTFILE_PART_STATUS, rleEncodeAsSingles([1, 1])),
+			new CustomTag(ECTagName.EC_TAG_PARTFILE_GAP_STATUS, rleEncodeAsSingles(toInterleavedUint64([0, fullSize]))),
+			new CustomTag(ECTagName.EC_TAG_PARTFILE_REQ_STATUS, rleEncodeAsSingles(toInterleavedUint64([0, PARTSIZE / 2]))),
+		]);
+
+		// No requested blocks left: the daemon sends the tag with zero length
+		const reqCleared = updatePartFile(123, [new CustomTag(ECTagName.EC_TAG_PARTFILE_REQ_STATUS, Buffer.alloc(0))]);
+
+		// Blocks requested again: encoded against the now-empty baseline, i.e. full data
+		const reqBack = updatePartFile(123, [new CustomTag(ECTagName.EC_TAG_PARTFILE_REQ_STATUS, rleEncodeAsSingles(toInterleavedUint64([PARTSIZE, PARTSIZE + PARTSIZE / 2])))]);
+
+		const { client } = createClientWithPackets([firstUpdate, reqCleared, reqBack]);
+
+		const first = await client.getDownloadQueueWithSources();
+		expect(first[0].chunkInfo?.chunks).toEqual([ChunkStatus.DOWNLOADING, ChunkStatus.AVAILABLE]);
+
+		const second = await client.getDownloadQueueWithSources();
+		expect(second[0].chunkInfo?.chunks).toEqual([ChunkStatus.AVAILABLE, ChunkStatus.AVAILABLE]);
+
+		const third = await client.getDownloadQueueWithSources();
+		expect(third[0].chunkInfo?.chunks).toEqual([ChunkStatus.AVAILABLE, ChunkStatus.DOWNLOADING]);
+	});
+
+	it('repeated getDownloadQueue accumulates source-name diffs (the daemon never resets that map)', async () => {
+		const firstQueue = new Packet(ECOpCode.EC_OP_DLOAD_QUEUE, Flags.useUtf8Numbers(), [
+			new UIntTag(ECTagName.EC_TAG_PARTFILE, 77, [
+				new Hash16Tag(ECTagName.EC_TAG_PARTFILE_HASH, hash),
+				new UIntTag(ECTagName.EC_TAG_PARTFILE_SIZE_FULL, fullSize),
+				new CustomTag(ECTagName.EC_TAG_PARTFILE_SOURCE_NAMES, Buffer.alloc(0), [
+					new UIntTag(ECTagName.EC_TAG_PARTFILE_SOURCE_NAMES, 1, [
+						new StringTag(ECTagName.EC_TAG_PARTFILE_SOURCE_NAMES, 'name-a'),
+						new UIntTag(ECTagName.EC_TAG_PARTFILE_SOURCE_NAMES_COUNTS, 3),
+					]),
+					new UIntTag(ECTagName.EC_TAG_PARTFILE_SOURCE_NAMES, 2, [
+						new StringTag(ECTagName.EC_TAG_PARTFILE_SOURCE_NAMES, 'name-b'),
+						new UIntTag(ECTagName.EC_TAG_PARTFILE_SOURCE_NAMES_COUNTS, 1),
+					]),
+				]),
+			]),
+		]);
+
+		// Second full request: buffers are re-sent in full (encoder reset), but the
+		// source-names container still only carries the diff since the previous request
+		const secondQueue = new Packet(ECOpCode.EC_OP_DLOAD_QUEUE, Flags.useUtf8Numbers(), [
+			new UIntTag(ECTagName.EC_TAG_PARTFILE, 77, [
+				new Hash16Tag(ECTagName.EC_TAG_PARTFILE_HASH, hash),
+				new UIntTag(ECTagName.EC_TAG_PARTFILE_SIZE_FULL, fullSize),
+				new CustomTag(ECTagName.EC_TAG_PARTFILE_SOURCE_NAMES, Buffer.alloc(0), [
+					new UIntTag(ECTagName.EC_TAG_PARTFILE_SOURCE_NAMES, 1, [new UIntTag(ECTagName.EC_TAG_PARTFILE_SOURCE_NAMES_COUNTS, 5)]),
+					new UIntTag(ECTagName.EC_TAG_PARTFILE_SOURCE_NAMES, 2, [new UIntTag(ECTagName.EC_TAG_PARTFILE_SOURCE_NAMES_COUNTS, 0)]),
+					new UIntTag(ECTagName.EC_TAG_PARTFILE_SOURCE_NAMES, 3, [
+						new StringTag(ECTagName.EC_TAG_PARTFILE_SOURCE_NAMES, 'name-c'),
+						new UIntTag(ECTagName.EC_TAG_PARTFILE_SOURCE_NAMES_COUNTS, 2),
+					]),
+				]),
+			]),
+		]);
+
+		const { client } = createClientWithPackets([firstQueue, secondQueue]);
+
+		const first = await client.getDownloadQueue();
+		expect(first[0].sourceNames).toEqual([
+			{ name: 'name-a', count: 3 },
+			{ name: 'name-b', count: 1 },
+		]);
+
+		const second = await client.getDownloadQueue();
+		expect(second[0].sourceNames).toEqual([
+			{ name: 'name-a', count: 5 },
+			{ name: 'name-c', count: 2 },
+		]);
+	});
+
+	it('getSharedFiles rebases the baselines of shared partfiles', async () => {
+		const firstUpdate = updatePartFile(123, [
+			new Hash16Tag(ECTagName.EC_TAG_PARTFILE_HASH, hash),
+			new UIntTag(ECTagName.EC_TAG_PARTFILE_SIZE_FULL, fullSize),
+			new CustomTag(ECTagName.EC_TAG_PARTFILE_PART_STATUS, rleEncodeAsSingles([1, 1])),
+			new CustomTag(ECTagName.EC_TAG_PARTFILE_GAP_STATUS, rleEncodeAsSingles(toInterleavedUint64([0, PARTSIZE]))),
+		]);
+
+		// The shared partfile goes through the same per-connection encoder: reset + full re-encode
+		const sharedGaps = [0, PARTSIZE + PARTSIZE / 2];
+		const sharedFiles = new Packet(ECOpCode.EC_OP_SHARED_FILES, Flags.useUtf8Numbers(), [
+			new UIntTag(ECTagName.EC_TAG_KNOWNFILE, 123, [
+				new Hash16Tag(ECTagName.EC_TAG_PARTFILE_HASH, hash),
+				new UIntTag(ECTagName.EC_TAG_PARTFILE_SIZE_FULL, fullSize),
+				new CustomTag(ECTagName.EC_TAG_PARTFILE_PART_STATUS, rleEncodeAsSingles([1, 1])),
+				new CustomTag(ECTagName.EC_TAG_PARTFILE_GAP_STATUS, rleEncodeAsSingles(toInterleavedUint64(sharedGaps))),
+			]),
+		]);
+
+		const currentGaps = [PARTSIZE, PARTSIZE + PARTSIZE / 2];
+		const secondUpdate = updatePartFile(123, [
+			new CustomTag(ECTagName.EC_TAG_PARTFILE_GAP_STATUS, rleEncodeAsSingles(xorBytes(toInterleavedUint64(currentGaps), toInterleavedUint64(sharedGaps)))),
+		]);
+
+		const { client } = createClientWithPackets([firstUpdate, sharedFiles, secondUpdate]);
+
+		const first = await client.getDownloadQueueWithSources();
+		expect(first[0].chunkInfo?.chunks).toEqual([ChunkStatus.AVAILABLE, ChunkStatus.COMPLETE]);
+
+		await client.getSharedFiles();
+
+		const second = await client.getDownloadQueueWithSources();
+		expect(second[0].chunkInfo?.chunks).toEqual([ChunkStatus.COMPLETE, ChunkStatus.AVAILABLE]);
+	});
+});
+
+describe('EC double tags', () => {
+	it('parses the aMule wire format: a null-terminated ASCII decimal string', () => {
+		const tag = new DoubleTag(ECTagName.EC_TAG_CLIENT_DOWN_SPEED);
+		tag.parseValue(Buffer.from('12.5\0', 'latin1'));
+		expect(tag.getValue()).toBe(12.5);
+
+		// Short strings must not fall back to 0 (the old readDoubleBE(0) guard did)
+		tag.parseValue(Buffer.from('0.5\0', 'latin1'));
+		expect(tag.getValue()).toBe(0.5);
+	});
+
+	it('round-trips through PacketWriter/PacketParser and is found by findNumericTag', () => {
+		const packet = new Packet(ECOpCode.EC_OP_STATS, Flags.useUtf8Numbers(), [new DoubleTag(ECTagName.EC_TAG_CLIENT_DOWN_SPEED, 350.25)]);
+
+		const parsed = PacketParser.parse(PacketWriter.write(packet));
+
+		const tag = findNumericTag(parsed.tags, ECTagName.EC_TAG_CLIENT_DOWN_SPEED);
+		expect(tag).toBeDefined();
+		expect(tag?.getValue()).toBe(350.25);
+	});
+
+	it('per-source download speed survives parsing and is normalized to bytes/s', async () => {
+		const hash = Buffer.from('00112233445566778899aabbccddeeff', 'hex');
+
+		const partFile = new UIntTag(ECTagName.EC_TAG_PARTFILE, 123, [
+			new Hash16Tag(ECTagName.EC_TAG_PARTFILE_HASH, hash),
+			new UIntTag(ECTagName.EC_TAG_PARTFILE_SIZE_FULL, PARTSIZE),
+		]);
+		const peer = new UIntTag(ECTagName.EC_TAG_CLIENT, 55, [
+			new StringTag(ECTagName.EC_TAG_CLIENT_NAME, 'Peer-1'),
+			new DoubleTag(ECTagName.EC_TAG_CLIENT_DOWN_SPEED, 350.25),
+			new UIntTag(ECTagName.EC_TAG_CLIENT_UP_SPEED, 2048),
+			new UIntTag(ECTagName.EC_TAG_CLIENT_REQUEST_FILE, 123),
+		]);
+		const update = new Packet(ECOpCode.EC_OP_STATS, Flags.useUtf8Numbers(), [partFile, new CustomTag(ECTagName.EC_TAG_CLIENT, Buffer.alloc(0), [peer])]);
+
+		// Through the real wire encoding, like a daemon response
+		const { client } = createClientWithPacket(PacketParser.parse(PacketWriter.write(update)));
+
+		const queue = await client.getDownloadQueueWithSources();
+		expect(queue[0].sources?.[0].downSpeed).toBe(Math.round(350.25 * 1024));
+		expect(queue[0].sources?.[0].upSpeed).toBe(2048);
 	});
 });
