@@ -1,6 +1,6 @@
 import { ECTagName } from '../ec/Codes';
 import { findNumericTag, findTag, type Tag } from '../ec/tag/Tag';
-import { ChunkStatus, PARTSIZE, type ChunkInfo, type PartFileStatusBuffers, type SourceNameCount, type SourceNameEntry } from '../types/download-details';
+import { ChunkStatus, PARTSIZE, type ChunkInfo, type PartFileStatusBuffers, type SourceNameEntry } from '../types/download-details';
 import { tagOwnNumericValue } from './utils';
 
 /**
@@ -179,19 +179,20 @@ export function computeChunkInfo(sizeFull: number, buffers: PartFileStatusBuffer
 }
 
 /**
- * Chunk details of a partfile tag from a full (non-incremental) download queue packet.
- * Only valid for EC_OP_GET_DLOAD_QUEUE responses: incremental updates (EC_OP_GET_UPDATE)
- * send XOR diffs for the status buffers and must be reconstructed statefully instead.
+ * Decode the status buffers of a file tag encoded after a daemon-side encoder reset,
+ * i.e. a full snapshot: EC_OP_GET_DLOAD_QUEUE / EC_OP_GET_SHARED_FILES responses at any
+ * detail level other than EC_DETAIL_UPDATE (see Get_EC_Response_GetDownloadQueue in
+ * aMule's ExternalConn.cpp). After the reset, a present buffer holds the complete
+ * current state and an absent one means the state is empty (the daemon skips the tag
+ * when there is nothing to encode), so every key is always defined.
  */
-export function chunkInfoFromPartFileTag(fileTag: Tag<any>): ChunkInfo {
-	const sizeFull = nestedNumeric(fileTag, ECTagName.EC_TAG_PARTFILE_SIZE_FULL);
+export function decodeFullPartFileStatusBuffers(fileTag: Tag<any>): PartFileStatusBuffers {
 	const raw = extractPartFileStatusBuffers(fileTag);
-	const decoded: PartFileStatusBuffers = {
-		partStatus: raw.partStatus ? rleDecode(raw.partStatus) : undefined,
-		gapStatus: raw.gapStatus ? rleDecode(raw.gapStatus) : undefined,
-		reqStatus: raw.reqStatus ? rleDecode(raw.reqStatus) : undefined,
+	return {
+		partStatus: raw.partStatus ? rleDecode(raw.partStatus) : Buffer.alloc(0),
+		gapStatus: raw.gapStatus ? rleDecode(raw.gapStatus) : Buffer.alloc(0),
+		reqStatus: raw.reqStatus ? rleDecode(raw.reqStatus) : Buffer.alloc(0),
 	};
-	return computeChunkInfo(sizeFull, decoded);
 }
 
 /**
@@ -228,12 +229,3 @@ export function sourceNameEntriesFromFileTag(fileTag: Tag<any>): SourceNameEntry
 	return entries;
 }
 
-/**
- * Stateless view of source-name diff entries: only entries whose name is present in
- * this very packet (i.e. new for the connection). Complete on the first request of a
- * connection; later requests only carry changes, so prefer the stateful update path
- * for polling.
- */
-export function sourceNameCountsFromEntries(entries: SourceNameEntry[]): SourceNameCount[] {
-	return entries.filter((entry) => entry.name !== undefined && entry.count > 0).map((entry) => ({ name: entry.name!, count: entry.count }));
-}

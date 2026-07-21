@@ -6,7 +6,6 @@ import { Packet } from '../ec/packet/Packet';
 import { ECTagName } from '../ec/Codes';
 import { findNumericTag, findTag } from '../ec/tag/Tag';
 import type { AmuleTransferringFile, FileStatus } from '../model';
-import { chunkInfoFromPartFileTag, sourceNameCountsFromEntries, sourceNameEntriesFromFileTag } from './DownloadDetailsResponse';
 import { parseKnownFileFields } from './SharedFilesResponse';
 import { toOptionalBool, toOptionalNumber } from './utils';
 
@@ -68,13 +67,8 @@ export class DownloadQueueResponseParser {
 				a4afSources,
 			};
 
-			if (file.fileHashHexString) {
-				file.chunkInfo = chunkInfoFromPartFileTag(fileTag);
-				const sourceNameEntries = sourceNameEntriesFromFileTag(fileTag);
-				if (sourceNameEntries) {
-					file.sourceNames = sourceNameCountsFromEntries(sourceNameEntries);
-				}
-			}
+			// chunkInfo and sourceNames are not parsed here: both are diffed per connection
+			// by the daemon and must be reconstructed statefully (see UpdateState)
 
 			files.push(file);
 		}

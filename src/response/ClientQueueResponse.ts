@@ -26,6 +26,11 @@ export class ClientQueueResponseParser {
 		for (const clientTag of clientTags) {
 			const tags = clientTag.nestedTags || [];
 
+			// EC_TAG_CLIENT_DOWN_SPEED is a double in kB/s (unlike EC_TAG_CLIENT_UP_SPEED
+			// and EC_TAG_PARTFILE_SPEED, integers in bytes/s — see ECSpecialCoreTags.cpp);
+			// normalized here so every speed field is bytes/s
+			const downSpeedKBps = toOptionalNumber(findNumericTag(tags, ECTagName.EC_TAG_CLIENT_DOWN_SPEED)?.getValue());
+
 			const client: AmuleUpDownClient = {
 				ecid: tagOwnNumericValue(clientTag),
 				clientName: findTag(tags, ECTagName.EC_TAG_CLIENT_NAME)?.getValue(),
@@ -42,7 +47,7 @@ export class ClientQueueResponseParser {
 				serverName: findTag(tags, ECTagName.EC_TAG_CLIENT_SERVER_NAME)?.getValue(),
 
 				upSpeed: toOptionalNumber(findNumericTag(tags, ECTagName.EC_TAG_CLIENT_UP_SPEED)?.getLong()),
-				downSpeed: toOptionalNumber(findNumericTag(tags, ECTagName.EC_TAG_CLIENT_DOWN_SPEED)?.getLong()),
+				downSpeed: downSpeedKBps === undefined ? undefined : Math.round(downSpeedKBps * 1024),
 				uploadSession: toOptionalNumber(findNumericTag(tags, ECTagName.EC_TAG_CLIENT_UPLOAD_SESSION)?.getLong()),
 				transferredDown: toOptionalNumber(findNumericTag(tags, ECTagName.EC_TAG_PARTFILE_SIZE_XFER)?.getLong()),
 				uploadedTotal: toOptionalNumber(findNumericTag(tags, ECTagName.EC_TAG_CLIENT_UPLOAD_TOTAL)?.getLong()),

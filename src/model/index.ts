@@ -96,7 +96,9 @@ export interface AmuleUpDownClient {
 	serverPort?: number;
 	serverName?: string;
 
+	/** Upload speed towards this client, in bytes/s */
 	upSpeed?: number;
+	/** Download speed from this client, in bytes/s (the daemon sends kB/s; normalized on parse) */
 	downSpeed?: number;
 	uploadSession?: number;
 	transferredDown?: number;
