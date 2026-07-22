@@ -70,7 +70,7 @@ async function main() {
 		}
 
 		// 4. Update the category (optional, just to test update functionality)
-		if (found) {
+		if (found && found.id !== undefined) {
 			const newComment = 'Updated comment';
 			console.log('Updating the test category comment...');
 			await client.updateCategory(found.id, {
@@ -93,7 +93,7 @@ async function main() {
 
 		// 5. Cleanup: Delete the test category
 		console.log('Cleaning up: Deleting the test category...');
-		if (found) {
+		if (found && found.id !== undefined) {
 			await client.deleteCategory(found.id);
 			console.log('Test category deleted.');
 		} else {

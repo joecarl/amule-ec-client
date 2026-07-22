@@ -65,6 +65,12 @@ export interface AmuleCategory {
 }
 
 export interface AmuleServer {
+	/**
+	 * ECID assigned by the daemon, needed to change the server's priority/static flag.
+	 * Only reported through the incremental update mechanism (getUpdate().servers);
+	 * getServerList() responses identify servers by IP and don't carry it.
+	 */
+	ecid?: number;
 	name?: string;
 	description?: string;
 	address?: string; // String representation usually
@@ -162,6 +168,13 @@ export enum DownloadCommand {
 	RESUME = 0x1a,
 	STOP = 0x1b,
 	DELETE = 0x1d,
+}
+
+/** Server connection priority (SRV_PR_* in aMule's Server.h). */
+export enum ServerPriority {
+	NORMAL = 0,
+	HIGH = 1,
+	LOW = 2,
 }
 
 export enum SearchType {

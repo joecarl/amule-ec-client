@@ -3,7 +3,10 @@ import { AmuleClient } from '../src/client/AmuleClient';
 import { ECOpCode, ECTagName } from '../src/ec/Codes';
 import { Flags } from '../src/ec/packet/Flags';
 import { Packet } from '../src/ec/packet/Packet';
-import { CustomTag, DoubleTag, Hash16Tag, StringTag, UByteTag, UIntTag, findNumericTag } from '../src/ec/tag/Tag';
+import { CustomTag, DoubleTag, Hash16Tag, Ipv4Tag, StringTag, UByteTag, UIntTag, findNumericTag } from '../src/ec/tag/Tag';
+import { ServerListResponseParser } from '../src/response/ServerListResponse';
+import { ServerPriority } from '../src/model';
+import { ServerException } from '../src/exceptions';
 import { PacketWriter } from '../src/ec/packet/PacketWriter';
 import { PacketParser } from '../src/ec/packet/PacketParser';
 import { ChunkStatus, PARTSIZE } from '../src/types/download-details';
@@ -494,5 +497,86 @@ describe('EC double tags', () => {
 		const queue = await client.getDownloadQueueWithSources();
 		expect(queue[0].sources?.[0].downSpeed).toBe(Math.round(350.25 * 1024));
 		expect(queue[0].sources?.[0].upSpeed).toBe(2048);
+	});
+});
+
+describe('server management', () => {
+	const noopPacket = () => new Packet(ECOpCode.EC_OP_NOOP, Flags.useUtf8Numbers(), []);
+
+	it('addServer sends EC_OP_SERVER_ADD with "ip:port" address and name strings', async () => {
+		const { client, sendRequest } = createClientWithPacket(noopPacket());
+		await client.addServer('10.0.0.1', 4661, 'My server');
+
+		const requestPacket = sendRequest.mock.calls[0][0].buildPacket();
+		expect(requestPacket.opCode).toBe(ECOpCode.EC_OP_SERVER_ADD);
+
+		const addressTag = requestPacket.tags.find((tag: { name: ECTagName }) => tag.name === ECTagName.EC_TAG_SERVER_ADDRESS);
+		expect(addressTag?.getValue()).toBe('10.0.0.1:4661');
+		const nameTag = requestPacket.tags.find((tag: { name: ECTagName }) => tag.name === ECTagName.EC_TAG_SERVER_NAME);
+		expect(nameTag?.getValue()).toBe('My server');
+	});
+
+	it('removeServer sends EC_OP_SERVER_REMOVE with the server IPv4 tag', async () => {
+		const { client, sendRequest } = createClientWithPacket(noopPacket());
+		await client.removeServer('10.0.0.1', 4661);
+
+		expect(sendRequest).toHaveBeenCalledTimes(1);
+		const requestPacket = sendRequest.mock.calls[0][0].buildPacket();
+		expect(requestPacket.opCode).toBe(ECOpCode.EC_OP_SERVER_REMOVE);
+
+		const serverTag = requestPacket.tags.find((tag: { name: ECTagName }) => tag.name === ECTagName.EC_TAG_SERVER);
+		expect(serverTag?.getValue()).toEqual({ address: '10.0.0.1', port: 4661 });
+	});
+
+	it('setServerPriority sends EC_OP_SERVER_SET_STATIC_PRIO keyed by ECID', async () => {
+		const { client, sendRequest } = createClientWithPacket(noopPacket());
+		await client.setServerPriority(42, ServerPriority.HIGH);
+
+		const requestPacket = sendRequest.mock.calls[0][0].buildPacket();
+		expect(requestPacket.opCode).toBe(ECOpCode.EC_OP_SERVER_SET_STATIC_PRIO);
+		expect(findNumericTag(requestPacket.tags, ECTagName.EC_TAG_SERVER)?.getInt()).toBe(42);
+		expect(findNumericTag(requestPacket.tags, ECTagName.EC_TAG_SERVER_PRIO)?.getInt()).toBe(ServerPriority.HIGH);
+		expect(requestPacket.tags.some((tag: { name: ECTagName }) => tag.name === ECTagName.EC_TAG_SERVER_STATIC)).toBe(false);
+	});
+
+	it('setServerStatic sends only the static flag', async () => {
+		const { client, sendRequest } = createClientWithPacket(noopPacket());
+		await client.setServerStatic(42, true);
+
+		const requestPacket = sendRequest.mock.calls[0][0].buildPacket();
+		expect(requestPacket.opCode).toBe(ECOpCode.EC_OP_SERVER_SET_STATIC_PRIO);
+		expect(findNumericTag(requestPacket.tags, ECTagName.EC_TAG_SERVER)?.getInt()).toBe(42);
+		expect(findNumericTag(requestPacket.tags, ECTagName.EC_TAG_SERVER_STATIC)?.getInt()).toBe(1);
+		expect(requestPacket.tags.some((tag: { name: ECTagName }) => tag.name === ECTagName.EC_TAG_SERVER_PRIO)).toBe(false);
+	});
+
+	it('surfaces EC_OP_FAILED responses as ServerException with the daemon reason', async () => {
+		const failed = new Packet(ECOpCode.EC_OP_FAILED, Flags.useUtf8Numbers(), [new StringTag(ECTagName.EC_TAG_STRING, 'server not found: 10.0.0.1:4661')]);
+		const { client } = createClientWithPacket(failed);
+
+		const rejection = await client.removeServer('10.0.0.1', 4661).catch((error) => error);
+		expect(rejection).toBeInstanceOf(ServerException);
+		expect(rejection.message).toBe('server not found: 10.0.0.1:4661');
+	});
+
+	it('server list parser exposes the ECID from update-style tags but not from IPv4-keyed tags', () => {
+		// Incremental update style: the tag's own value is the ECID
+		const updateStyle = new UIntTag(ECTagName.EC_TAG_SERVER, 42, [
+			new StringTag(ECTagName.EC_TAG_SERVER_NAME, 'Update server'),
+			new UIntTag(ECTagName.EC_TAG_SERVER_PRIO, ServerPriority.LOW),
+		]);
+		// Full server list style: the tag's own value is the IPv4 address
+		const fullListStyle = new Ipv4Tag(ECTagName.EC_TAG_SERVER, { address: '1.2.3.4', port: 4661 }, [
+			new StringTag(ECTagName.EC_TAG_SERVER_NAME, 'Listed server'),
+		]);
+
+		const { servers } = ServerListResponseParser.fromTags([updateStyle, fullListStyle]);
+
+		expect(servers[0].ecid).toBe(42);
+		expect(servers[0].name).toBe('Update server');
+		expect(servers[0].priority).toBe(ServerPriority.LOW);
+		expect(servers[1].ecid).toBeUndefined();
+		expect(servers[1].ip).toBe('1.2.3.4');
+		expect(servers[1].port).toBe(4661);
 	});
 });

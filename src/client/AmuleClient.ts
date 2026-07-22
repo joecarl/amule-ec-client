@@ -4,10 +4,13 @@
 
 import { AmuleConnection } from './AmuleConnection';
 import type { UpdateState } from './UpdateState';
-import type { AmuleFile, AmuleTransferringFile, AmuleCategory, AmuleServer, SearchType, AmuleUpDownClient } from '../model';
+import type { AmuleFile, AmuleTransferringFile, AmuleCategory, AmuleServer, SearchType, AmuleUpDownClient, ServerPriority } from '../model';
 import { DownloadCommand } from '../model';
 import type { SearchFilters } from '../types';
-import { EcPrefs, ECDetailLevel } from '../ec/Codes';
+import { EcPrefs, ECDetailLevel, ECOpCode, ECTagName } from '../ec/Codes';
+import { findTag } from '../ec/tag/Tag';
+import { ServerException } from '../exceptions';
+import type { Request } from '../request/Request';
 import type { AmulePreferences } from '../types/preferences';
 import type { StatsResponse } from '../response/StatsResponse';
 import type { SearchResultsResponse } from '../response/SearchResultsResponse';
@@ -284,13 +287,29 @@ export class AmuleClient {
 	}
 
 	/**
-	 * Connect to a specific server
+	 * Send a command-style request (one answered with EC_OP_NOOP) and surface a
+	 * daemon rejection: an EC_OP_FAILED response carries the reason in an
+	 * EC_TAG_STRING tag, which becomes the ServerException message.
+	 */
+	private async sendCommand(request: Request): Promise<void> {
+		const packet = await this.connection.sendRequest(request);
+
+		if (packet.opCode === ECOpCode.EC_OP_FAILED) {
+			const reason = findTag(packet.tags, ECTagName.EC_TAG_STRING)?.getValue();
+			throw new ServerException(typeof reason === 'string' ? reason : 'Request failed');
+		}
+	}
+
+	/**
+	 * Connect to a specific server, or to any server when ip/port are omitted.
+	 *
+	 * @throws ServerException if the daemon rejects the request (server not in the
+	 * list, or eD2k disabled in preferences).
 	 */
 	async connectToServer(ip?: string, port?: number): Promise<void> {
 		const { ServerConnectRequest } = await import('../request/ServerConnectRequest');
 
-		const request = new ServerConnectRequest(ip, port);
-		await this.connection.sendRequest(request);
+		await this.sendCommand(new ServerConnectRequest(ip, port));
 	}
 
 	/**
@@ -299,8 +318,57 @@ export class AmuleClient {
 	async disconnectFromServer(): Promise<void> {
 		const { ServerDisconnectRequest } = await import('../request/ServerDisconnectRequest');
 
-		const request = new ServerDisconnectRequest();
-		await this.connection.sendRequest(request);
+		await this.sendCommand(new ServerDisconnectRequest());
+	}
+
+	/**
+	 * Add a server to the server list.
+	 *
+	 * @throws ServerException ("Server not added") if the daemon rejects it, e.g.
+	 * the server is already listed or its IP is blocked by the IP filter.
+	 */
+	async addServer(ip: string, port: number, name?: string): Promise<void> {
+		const { ServerAddRequest } = await import('../request/ServerAddRequest');
+
+		await this.sendCommand(new ServerAddRequest(ip, port, name));
+	}
+
+	/**
+	 * Remove a server from the server list.
+	 *
+	 * @throws ServerException ("server not found: ip:port") if no listed server
+	 * matches the given address.
+	 */
+	async removeServer(ip: string, port: number): Promise<void> {
+		const { ServerRemoveRequest } = await import('../request/ServerRemoveRequest');
+
+		await this.sendCommand(new ServerRemoveRequest(ip, port));
+	}
+
+	/**
+	 * Set a server's connection priority.
+	 *
+	 * The daemon identifies the server by its ECID, which is only reported through
+	 * the incremental update mechanism: take it from getUpdate().servers
+	 * (getServerList() responses identify servers by IP and don't carry the ECID).
+	 *
+	 * Note the daemon always answers EC_OP_NOOP, even for an unknown ECID: a stale
+	 * ECID makes this a silent no-op, so verify through getUpdate() when it matters.
+	 */
+	async setServerPriority(ecid: number, priority: ServerPriority): Promise<void> {
+		const { ServerSetStaticPrioRequest } = await import('../request/ServerSetStaticPrioRequest');
+
+		await this.sendCommand(new ServerSetStaticPrioRequest(ecid, { priority }));
+	}
+
+	/**
+	 * Set or clear a server's static flag (static servers are never auto-removed).
+	 * See setServerPriority for how to obtain the ECID and the silent no-op caveat.
+	 */
+	async setServerStatic(ecid: number, isStatic: boolean): Promise<void> {
+		const { ServerSetStaticPrioRequest } = await import('../request/ServerSetStaticPrioRequest');
+
+		await this.sendCommand(new ServerSetStaticPrioRequest(ecid, { isStatic }));
 	}
 
 	/**
@@ -395,12 +463,16 @@ export class AmuleClient {
 
 	/**
 	 * Trigger a server list update from an URL.
+	 *
+	 * Fire-and-forget: the daemon saves the URL as the new server.met source, answers
+	 * EC_OP_NOOP right away and downloads in a background thread, so success here only
+	 * means the request was accepted. Failures (invalid URL, unreachable host) are just
+	 * logged daemon-side; observe the outcome through getServerList()/getUpdate().
 	 */
 	async updateServerListFromUrl(url: string): Promise<void> {
 		const { ServerUpdateFromUrlRequest } = await import('../request/ServerUpdateFromUrlRequest');
 
-		const request = new ServerUpdateFromUrlRequest(url);
-		await this.connection.sendRequest(request);
+		await this.sendCommand(new ServerUpdateFromUrlRequest(url));
 	}
 
 	/**

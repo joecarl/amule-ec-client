@@ -5,7 +5,7 @@
 import { Packet } from '../ec/packet/Packet';
 import { ECTagName } from '../ec/Codes';
 import { findNumericTag, findTag } from '../ec/tag/Tag';
-import { formatIp, toOptionalBool } from './utils';
+import { formatIp, tagOwnNumericValue, toOptionalBool } from './utils';
 import type { AmuleServer } from '../model';
 
 export interface ServerListResponse {
@@ -57,6 +57,9 @@ export class ServerListResponseParser {
 			}
 
 			servers.push({
+				// In incremental updates the tag's own value is the server's ECID;
+				// in the full server list it is the IPv4 address (non-numeric -> undefined)
+				ecid: tagOwnNumericValue(serverTag),
 				name: findTag(nested, ECTagName.EC_TAG_SERVER_NAME)?.getValue(),
 				description: findTag(nested, ECTagName.EC_TAG_SERVER_DESC)?.getValue(),
 				address: findTag(nested, ECTagName.EC_TAG_SERVER_ADDRESS)?.getValue(),
