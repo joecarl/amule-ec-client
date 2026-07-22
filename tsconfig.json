@@ -3,6 +3,7 @@
 		"module": "ESNext",
 		"target": "ES2022",
 		"moduleResolution": "bundler",
+		"resolveJsonModule": true,
 		"declaration": true,
 		"strict": true,
 		"outDir": "./dist",

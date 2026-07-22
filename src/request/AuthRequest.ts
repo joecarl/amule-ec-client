@@ -5,9 +5,11 @@
 import { Request } from './Request';
 import { ECOpCode, ECTagName, ProtocolVersion } from '../ec/Codes';
 import { Hash16Tag, UShortTag, StringTag, CustomTag } from '../ec/tag/Tag';
+// Named imports so the bundler inlines just these two fields, not the whole manifest
+import { name as packageName, version as packageVersion } from '../../package.json';
 
 export class AuthClientInfoRequest extends Request {
-	constructor(clientName: string = 'amule-ts-client', clientVersion: string = '1.0.0') {
+	constructor(clientName: string = packageName, clientVersion: string = packageVersion) {
 		super(ECOpCode.EC_OP_AUTH_REQ);
 
 		// Add client info
