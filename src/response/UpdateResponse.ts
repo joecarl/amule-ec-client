@@ -5,7 +5,7 @@
 import { Packet } from '../ec/packet/Packet';
 import { ECTagName } from '../ec/Codes';
 import { findTag, findNumericTag } from '../ec/tag/Tag';
-import { toOptionalBool, toOptionalIp } from './utils';
+import { tagOwnNumericValue, toOptionalBool, toOptionalIp } from './utils';
 import type { AmuleFile, AmuleTransferringFile, AmuleUpDownClient, AmuleServer, AmuleFriend } from '../model';
 import { SharedFilesResponseParser } from './SharedFilesResponse';
 import { DownloadQueueResponseParser } from './DownloadQueueResponse';
@@ -52,6 +52,7 @@ export class UpdateResponseParser {
 		for (const friendTag of friendTags) {
 			const nested = friendTag.nestedTags || [];
 			friends.push({
+				ecid: tagOwnNumericValue(friendTag),
 				name: findTag(nested, ECTagName.EC_TAG_FRIEND_NAME)?.getValue(),
 				userHashHexString: findTag(nested, ECTagName.EC_TAG_FRIEND_HASH)?.getValue()?.toString('hex'),
 				ip: toOptionalIp(findNumericTag(nested, ECTagName.EC_TAG_FRIEND_IP)?.getInt()),

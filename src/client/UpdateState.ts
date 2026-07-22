@@ -26,7 +26,7 @@
 
 import { ECTagName } from '../ec/Codes';
 import { Packet } from '../ec/packet/Packet';
-import type { AmuleFile, AmuleTransferringFile, AmuleUpDownClient } from '../model';
+import type { AmuleFile, AmuleFriend, AmuleServer, AmuleTransferringFile, AmuleUpDownClient } from '../model';
 import { computeChunkInfo, decodeFullPartFileStatusBuffers, extractPartFileStatusBuffers, rleDecode, sourceNameEntriesFromFileTag, xorReconstruct } from '../response/DownloadDetailsResponse';
 import { DownloadQueueResponseParser } from '../response/DownloadQueueResponse';
 import { UpdateResponseParser, type UpdateResponse } from '../response/UpdateResponse';
@@ -53,6 +53,8 @@ export class UpdateState {
 	private downloads = new Map<number, AmuleTransferringFile>();
 	private sharedFiles = new Map<number, AmuleFile>();
 	private clients = new Map<number, AmuleUpDownClient>();
+	private servers = new Map<number, AmuleServer>();
+	private friends = new Map<number, AmuleFriend>();
 	private statusBuffers = new Map<number, PartFileStatusBuffers>();
 	private sourceNames = new Map<number, Map<number, SourceNameCount>>();
 
@@ -65,6 +67,11 @@ export class UpdateState {
 
 	/**
 	 * Apply an incremental EC_OP_GET_UPDATE response.
+	 *
+	 * Every collection in the response (downloads, shared files, clients, servers,
+	 * friends) is valuemap-diffed by the daemon: after an object's first appearance,
+	 * only its changed fields are resent. All of them are merged here so callers
+	 * always see full snapshots.
 	 */
 	apply(packet: Packet): UpdateResponse {
 		const parsed = UpdateResponseParser.fromPacket(packet);
@@ -72,6 +79,8 @@ export class UpdateState {
 		const downloadQueue = this.mergeCollection(this.downloads, parsed.downloadQueue);
 		const sharedFiles = this.mergeCollection(this.sharedFiles, parsed.sharedFiles);
 		const clients = this.mergeCollection(this.clients, parsed.clients);
+		const servers = this.mergeCollection(this.servers, parsed.servers);
+		const friends = this.mergeCollection(this.friends, parsed.friends);
 
 		for (const ecid of [...this.statusBuffers.keys()]) {
 			if (!this.downloads.has(ecid)) {
@@ -91,8 +100,8 @@ export class UpdateState {
 			downloadQueue,
 			sharedFiles,
 			clients,
-			servers: parsed.servers,
-			friends: parsed.friends,
+			servers,
+			friends,
 		};
 	}
 

@@ -137,6 +137,8 @@ export interface AmuleUpDownClient {
 }
 
 export interface AmuleFriend {
+	/** ECID assigned by the daemon, carried as the friend tag's own value in updates. */
+	ecid?: number;
 	name?: string;
 	userHashHexString?: string;
 	ip?: string;

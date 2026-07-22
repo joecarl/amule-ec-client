@@ -178,7 +178,8 @@ describe('additional methods', () => {
 			new Hash16Tag(ECTagName.EC_TAG_CLIENT_HASH, clientHash),
 			new StringTag(ECTagName.EC_TAG_CLIENT_SOFTWARE, 'aMule'),
 			new StringTag(ECTagName.EC_TAG_CLIENT_SOFT_VER_STR, '2.3.3'),
-			new UIntTag(ECTagName.EC_TAG_CLIENT_USER_IP, 0x7f000001),
+			// aMule's internal packing: first octet in the least significant byte
+			new UIntTag(ECTagName.EC_TAG_CLIENT_USER_IP, 0x0100007f),
 			new UIntTag(ECTagName.EC_TAG_CLIENT_USER_PORT, 4662),
 			new UIntTag(ECTagName.EC_TAG_CLIENT_REQUEST_FILE, 123),
 		]);
@@ -557,6 +558,63 @@ describe('server management', () => {
 		const rejection = await client.removeServer('10.0.0.1', 4661).catch((error) => error);
 		expect(rejection).toBeInstanceOf(ServerException);
 		expect(rejection.message).toBe('server not found: 10.0.0.1:4661');
+	});
+
+	it('getUpdate merges incremental server diffs into full snapshots', async () => {
+		// First update: full server data (first appearance sends every field)
+		const firstUpdate = new Packet(ECOpCode.EC_OP_STATS, Flags.useUtf8Numbers(), [
+			new CustomTag(ECTagName.EC_TAG_SERVER, Buffer.alloc(0), [
+				new UIntTag(ECTagName.EC_TAG_SERVER, 42, [
+					new StringTag(ECTagName.EC_TAG_SERVER_NAME, 'Test server'),
+					// aMule's internal packing: first octet in the least significant byte
+					new UIntTag(ECTagName.EC_TAG_SERVER_IP, 0x04030201),
+					new UIntTag(ECTagName.EC_TAG_SERVER_PORT, 4661),
+					new UIntTag(ECTagName.EC_TAG_SERVER_PRIO, ServerPriority.NORMAL),
+				]),
+			]),
+		]);
+		// Second update: only the changed field is resent (valuemap diff)
+		const secondUpdate = new Packet(ECOpCode.EC_OP_STATS, Flags.useUtf8Numbers(), [
+			new CustomTag(ECTagName.EC_TAG_SERVER, Buffer.alloc(0), [
+				new UIntTag(ECTagName.EC_TAG_SERVER, 42, [new UIntTag(ECTagName.EC_TAG_SERVER_PRIO, ServerPriority.HIGH)]),
+			]),
+		]);
+
+		const { client } = createClientWithPackets([firstUpdate, secondUpdate]);
+
+		const first = await client.getUpdate();
+		expect(first.servers[0].name).toBe('Test server');
+		expect(first.servers[0].priority).toBe(ServerPriority.NORMAL);
+
+		const second = await client.getUpdate();
+		expect(second.servers.length).toBe(1);
+		expect(second.servers[0].ecid).toBe(42);
+		expect(second.servers[0].priority).toBe(ServerPriority.HIGH);
+		// Unchanged fields must survive the merge instead of coming back undefined
+		expect(second.servers[0].name).toBe('Test server');
+		expect(second.servers[0].ip).toBe('1.2.3.4');
+		expect(second.servers[0].port).toBe(4661);
+	});
+
+	it('getUpdate drops servers missing from the response', async () => {
+		const twoServers = new Packet(ECOpCode.EC_OP_STATS, Flags.useUtf8Numbers(), [
+			new CustomTag(ECTagName.EC_TAG_SERVER, Buffer.alloc(0), [
+				new UIntTag(ECTagName.EC_TAG_SERVER, 42, [new StringTag(ECTagName.EC_TAG_SERVER_NAME, 'Server A')]),
+				new UIntTag(ECTagName.EC_TAG_SERVER, 43, [new StringTag(ECTagName.EC_TAG_SERVER_NAME, 'Server B')]),
+			]),
+		]);
+		const oneServer = new Packet(ECOpCode.EC_OP_STATS, Flags.useUtf8Numbers(), [
+			new CustomTag(ECTagName.EC_TAG_SERVER, Buffer.alloc(0), [new UIntTag(ECTagName.EC_TAG_SERVER, 43, [])]),
+		]);
+
+		const { client } = createClientWithPackets([twoServers, oneServer]);
+
+		const first = await client.getUpdate();
+		expect(first.servers.map((s) => s.ecid)).toEqual([42, 43]);
+
+		const second = await client.getUpdate();
+		expect(second.servers.map((s) => s.ecid)).toEqual([43]);
+		expect(second.servers[0].name).toBe('Server B');
 	});
 
 	it('server list parser exposes the ECID from update-style tags but not from IPv4-keyed tags', () => {
