@@ -172,6 +172,15 @@ export enum DownloadCommand {
 	DELETE = 0x1d,
 }
 
+/** Download (partfile) priority (PR_* in aMule's Constants.h). */
+export enum FilePriority {
+	LOW = 0,
+	NORMAL = 1,
+	HIGH = 2,
+	VERY_HIGH = 3,
+	AUTO = 5,
+}
+
 /** Server connection priority (SRV_PR_* in aMule's Server.h). */
 export enum ServerPriority {
 	NORMAL = 0,

@@ -4,7 +4,7 @@
 
 import { AmuleConnection } from './AmuleConnection';
 import type { UpdateState } from './UpdateState';
-import type { AmuleFile, AmuleTransferringFile, AmuleCategory, AmuleServer, SearchType, AmuleUpDownClient, ServerPriority } from '../model';
+import type { AmuleFile, AmuleTransferringFile, AmuleCategory, AmuleServer, SearchType, AmuleUpDownClient, ServerPriority, FilePriority } from '../model';
 import { DownloadCommand } from '../model';
 import type { SearchFilters } from '../types';
 import { EcPrefs, ECDetailLevel, ECOpCode, ECTagName } from '../ec/Codes';
@@ -482,6 +482,19 @@ export class AmuleClient {
 		const { SharedFilePriorityRequest } = await import('../request/SharedFilePriorityRequest');
 
 		const request = new SharedFilePriorityRequest(hash, priority);
+		await this.connection.sendRequest(request);
+	}
+
+	/**
+	 * Set download priority for a partfile.
+	 *
+	 * Like the other partfile commands, the daemon answers EC_OP_NOOP even when it
+	 * could not apply the change; EC_OP_FAILED is only returned for an unknown hash.
+	 */
+	async setFilePriority(hash: Buffer, priority: FilePriority): Promise<void> {
+		const { PartFilePriorityRequest } = await import('../request/PartFilePriorityRequest');
+
+		const request = new PartFilePriorityRequest(hash, priority);
 		await this.connection.sendRequest(request);
 	}
 
